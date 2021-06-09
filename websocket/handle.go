@@ -1,14 +1,14 @@
 package websocket
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/conn"
+	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/socket"
 	"github.com/gorilla/websocket"
 	"io"
 	"io/ioutil"
 	"net"
-	"os"
 	"strconv"
 	"time"
 )
@@ -19,7 +19,8 @@ const (
 
 type engineHandle struct {
 	*Engine
-	wsConn *websocket.Conn
+	wsConnBuf     *conn.ConnectionBuf
+	connBufReader *bufWebsocketReader
 	//wsConnReadBuf *bufio.Reader
 	readBufSlice []byte
 	readLastBuf  *bytes.Buffer
@@ -28,10 +29,11 @@ type engineHandle struct {
 // begin 开始
 func (this *engineHandle) begin() {
 	defer func() { recover() }()
-	defer func() { this.wsConn.Close() }()
+	defer func() { this.wsConnBuf.Close() }()
 	this.readBufSlice = make([]byte, maxMessageSize, maxMessageSize)
 	//this.wsConnReadBuf = bufio.NewReader(this.wsConn.UnderlyingConn())
 	this.readLastBuf = &bytes.Buffer{}
+	this.connBufReader = newBufWebsocketReader(this.wsConnBuf)
 	go this.writeLoop()
 	this.readLoop()
 }
@@ -39,9 +41,9 @@ func (this *engineHandle) begin() {
 // readLoop 读循环
 func (this *engineHandle) readLoop() {
 
-	this.wsConn.SetReadLimit(maxMessageSize)
-	_ = this.wsConn.SetReadDeadline(time.Time{})
-	this.wsConn.SetPongHandler(func(string) error { _ = this.wsConn.SetReadDeadline(time.Time{}); return nil })
+	this.wsConnBuf.SetReadLimit(maxMessageSize)
+	_ = this.wsConnBuf.SetReadDeadline(time.Time{})
+	this.wsConnBuf.SetPongHandler(func(string) error { _ = this.wsConnBuf.SetReadDeadline(time.Time{}); return nil })
 	for {
 		context, err := this.readMsgContext()
 		if err == io.EOF {
@@ -64,7 +66,7 @@ func (this *engineHandle) readLoop() {
 			continue
 		}
 
-		handleFn, ok := this.matchCmd(context.Cmd)
+		handleFn, ok := this.matchCmd(context.Cmd())
 		if !ok {
 			fmt.Println("404")
 			continue
@@ -78,47 +80,42 @@ func (this *engineHandle) writeLoop() {
 }
 
 // readMsgContext 读取一个context消息
-func (this *engineHandle) readMsgContext() (*Context, error) {
-	websocketContext := &Context{}
-	_, r, err := this.wsConn.NextReader()
-	if err != nil {
-		return nil, err
-	}
-	tmpBuffReader := bufio.NewReader(r)
-	cmdUrl, _, err := tmpBuffReader.ReadLine()
-	if err == io.EOF {
-		return nil, err
-	}
-	if err != nil {
-		return nil, ErrReadCmd
-	}
+func (this *engineHandle) readMsgContext() (*socket.Context, error) {
+	//_, r, err := this.wsConn.NextReader()
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	msgId, _, err := tmpBuffReader.ReadLine()
+	//tmpBuffReader := bufio.NewReader(r)
+	cmdUrl, err := this.connBufReader.ReadLine()
 	if err != nil {
 		return nil, err
 	}
 
-	isFileStr, _, err := tmpBuffReader.ReadLine()
+	msgId, err := this.connBufReader.ReadLine()
 	if err != nil {
-		return nil, ErrReadMsgType
+		return nil, err
+	}
+
+	isFileStr, err := this.connBufReader.ReadLine()
+	if err != nil {
+		return nil, err
 	}
 
 	isFile := true
-	if string(isFileStr) == "0" {
+	if string(isFileStr) == "1" {
 		isFile = false
 	}
 
+	msgFile := ""
 	if isFile {
-		filePath, _, err := tmpBuffReader.ReadLine()
+		filePath, err := this.connBufReader.ReadLine()
 		if err != nil {
-			return nil, ErrReadMsgContent
+			return nil, err
 		}
-		websocketContext.msgFile, err = os.OpenFile(string(filePath), os.O_RDONLY, 0666)
-		if err != nil {
-			return nil, ErrReadMsgContent
-		}
+		msgFile = filePath
 	} else {
-		datLenStr, _, err := tmpBuffReader.ReadLine()
+		datLenStr, err := this.connBufReader.ReadLine()
 		if err != nil {
 			return nil, ErrReadMsgContent
 		}
@@ -127,31 +124,21 @@ func (this *engineHandle) readMsgContext() (*Context, error) {
 			return nil, ErrReadMsgContent
 		}
 
-		msgFile, err := this.readSizeContentToFile(tmpBuffReader, int(dataLen))
+		msgFile, err = this.readSizeContentToFile(int(dataLen))
 		if err != nil {
 			return nil, err
 		}
-		websocketContext.DataLen = dataLen
-		websocketContext.msgFile = msgFile
 	}
 
-	websocketContext.msgFileBuffReader = bufio.NewReader(websocketContext.msgFile)
-	websocketContext.Cmd = string(cmdUrl)
-	websocketContext.MsgId = string(msgId)
-	websocketContext.Mod = string(isFileStr)
-	websocketContext.wsConn = this.wsConn
-	websocketContext.parseFields()
-	if websocketContext.Err != nil {
-		return nil, websocketContext.Err
-	}
-	return websocketContext, nil
+	return socket.NewWebSocketContext(this.wsConnBuf, cmdUrl, msgId, isFileStr, msgFile), nil
 }
 
-func (this *engineHandle) readSizeContentToFile(currentBufferReader *bufio.Reader, size int) (*os.File, error) {
+func (this *engineHandle) readSizeContentToFile(size int) (string, error) {
 	tmpFile, err := ioutil.TempFile("devPlatform", "*")
 	if err != nil {
-		return nil, ErrCreateContentFile
+		return "", ErrCreateContentFile
 	}
+	defer tmpFile.Close()
 
 	totalReadSize := this.readLastBuf.Len()
 	if totalReadSize >= size {
@@ -160,32 +147,32 @@ func (this *engineHandle) readSizeContentToFile(currentBufferReader *bufio.Reade
 		lastData = lastData[size:]
 		_, err = tmpFile.Write(writeData)
 		if err != nil {
-			return nil, ErrReadMsgContent
+			return "", ErrReadMsgContent
 		}
 
 		this.readLastBuf.Reset()
 		if len(lastData) > 0 {
 			this.readLastBuf.Write(lastData)
 		}
-		return tmpFile, nil
+		return tmpFile.Name(), nil
 	} else {
 		_, err = tmpFile.Write(this.readLastBuf.Bytes())
 		if err != nil {
-			return nil, ErrReadMsgContent
+			return "", ErrReadMsgContent
 		}
 		this.readLastBuf.Reset()
 	}
 
 	for {
-		readLen, err := currentBufferReader.Read(this.readBufSlice)
-		if err == io.EOF {
-			_, r, err := this.wsConn.NextReader()
-			if err != nil {
-				return nil, err
-			}
-			currentBufferReader = bufio.NewReader(r)
-			continue
-		}
+		readLen, err := this.connBufReader.Read(this.readBufSlice)
+		//if err == io.EOF {
+		//	_, r, err := this.wsConn.NextReader()
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	currentBufferReader = bufio.NewReader(r)
+		//	continue
+		//}
 		//readLen, err = this.wsConnReadBuf.Read(this.readBufSlice)
 		//if err != nil {
 		//	return nil, ErrReadMsgContent
@@ -201,14 +188,14 @@ func (this *engineHandle) readSizeContentToFile(currentBufferReader *bufio.Reade
 		readData := this.readBufSlice[:readLen]
 		_, err = tmpFile.Write(readData)
 		if err != nil {
-			return nil, ErrReadMsgContent
+			return "", ErrReadMsgContent
 		}
 
 		if isOk {
 			if otherSize > 0 {
 				this.readLastBuf.Write(this.readBufSlice[readLen : readLen+otherSize])
 			}
-			return tmpFile, nil
+			return tmpFile.Name(), nil
 		}
 
 	}

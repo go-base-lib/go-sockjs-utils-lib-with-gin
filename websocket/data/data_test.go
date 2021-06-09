@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -162,8 +163,16 @@ func TestMarshalTopArray(t *testing.T) {
 	if err = UnmarshalByFilePath(p, &readTmpData); err != nil {
 		panic(err)
 	}
+
+	fieldInfos, err := Unmarshal2FieldInfoMap(p)
+	if err != nil {
+		panic(err)
+	}
+	content, _ := ioutil.ReadFile(p)
+	fmt.Println(string(content))
 	os.RemoveAll(filepath.Dir(p))
 
+	fmt.Println(fieldInfos)
 	fmt.Println(p)
 }
 

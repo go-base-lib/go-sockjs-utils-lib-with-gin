@@ -9,4 +9,6 @@ const (
 	FieldTypeBool
 	FieldTypeList
 	FieldTypeStruct
+	FieldTypeVoid
+	FieldTypeError
 )

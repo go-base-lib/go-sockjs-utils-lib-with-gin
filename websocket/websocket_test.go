@@ -8,11 +8,11 @@ import (
 
 func TestWebSocket(t *testing.T) {
 
-	engine := NewWebSocket("/dev")
+	engine := NewWebSocketServer("/dev")
 	engine.GET("/", func(context *gin.Context) {
 		context.String(200, "1sdf")
 	})
-	if err := engine.Run(":8030"); err != nil {
+	if err := engine.Run(":65528"); err != nil {
 		panic(err)
 	}
 

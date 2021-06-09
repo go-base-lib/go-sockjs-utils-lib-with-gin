@@ -12,7 +12,7 @@ var upGrader = websocket.Upgrader{
 	},
 }
 
-func NewWebSocket(socketUrl string) *Engine {
+func NewWebSocketServer(socketUrl string) *Engine {
 	engine := gin.Default()
 	return NewWebSocketByGin(engine, socketUrl)
 }

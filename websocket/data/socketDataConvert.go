@@ -2,6 +2,7 @@ package data
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -16,7 +17,75 @@ type fieldReflectInfo struct {
 	field reflect.StructField
 }
 
+type ErrorMsg struct {
+	Code string
+	Msg  string
+}
+
+func (e *ErrorMsg) Error() string {
+	return e.Msg
+}
+
+func (e ErrorMsg) RuntimeError() {
+	panic("implement me")
+}
+
 const newLine = '\n'
+
+func IsVoid(data string) bool {
+	if len(data) == 0 {
+		return false
+	}
+
+	return data[0] == strconv.FormatInt(int64(FieldTypeVoid), 10)[0]
+}
+
+func IsErr(data string) bool {
+	if len(data) == 0 {
+		return false
+	}
+	return data[0] == strconv.FormatInt(int64(FieldTypeError), 10)[0]
+}
+
+func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
+	defer f.Close()
+	bufReader := bufio.NewReader(f)
+	fieldType, err := bufReader.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	if string(fieldType) != strconv.FormatInt(int64(FieldTypeError), 10) {
+		return nil, errors.New("非错误类型")
+	}
+
+	code, err := bufReader.ReadString(newLine)
+	if err != nil {
+		return nil, err
+	}
+
+	msgLenStr, err := bufReader.ReadString(newLine)
+	if err != nil {
+		return nil, err
+	}
+
+	msgLen, err := strconv.ParseInt(msgLenStr, 10, 64)
+	if err != nil {
+		return nil, errors.New("转换错误消息长度失败")
+	}
+
+	buf := make([]byte, msgLen, msgLen)
+	read, err := bufReader.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ErrorMsg{
+		Code: code,
+		Msg:  string(buf[:read]),
+	}, nil
+
+}
 
 func Marshal(v interface{}) (p string, err error) {
 	tmpDir := filepath.Join(os.TempDir(), "devPlatform")
@@ -192,6 +261,173 @@ func marshalType2FieldType(rt reflect.Type) (FieldType, string, error) {
 	return fieldType, strconv.FormatInt(int64(fieldType), 10), nil
 }
 
+func Unmarshal2FieldInfoMap(fp string) (map[string]*FieldInfo, error) {
+	f, err := os.OpenFile(fp, os.O_RDONLY, 0666)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	rFns := newReadDataFns(f)
+	fieldType, err := rFns.ReadFieldType()
+	if err != nil {
+		return nil, err
+	}
+	return unmarshal2FieldInfoMap(rFns, fieldType)
+}
+
+func unmarshal2FieldInfoMap(r *readDataFns, fieldType FieldType) (map[string]*FieldInfo, error) {
+	result := make(map[string]*FieldInfo)
+	if fieldType == FieldTypeList {
+		listLen, err := r.ReadFieldLen()
+		if err != nil {
+			return nil, err
+		}
+		eleFieldType, err := r.ReadFieldType()
+		if err != nil {
+			return nil, err
+		}
+
+		for i := int64(0); i < listLen; i++ {
+			name := strconv.FormatInt(i, 10)
+			startPos, err := r.NowIndex()
+			if err != nil {
+				return nil, err
+			}
+
+			if eleFieldType == FieldTypeStruct || eleFieldType == FieldTypeList {
+				childrenMap, err := unmarshal2FieldInfoMap(r, eleFieldType)
+				if err != nil {
+					return nil, err
+				}
+				endPos, err := r.NowIndex()
+				if err != nil {
+					return nil, err
+				}
+				result[name] = &FieldInfo{
+					name:     name,
+					startPos: startPos,
+					endPos:   endPos,
+					len:      endPos - startPos,
+					children: childrenMap,
+				}
+				continue
+			}
+
+
+			if eleFieldType == FieldTypeString {
+				fieldLen, err := r.ReadFieldLen()
+				if err != nil {
+					return nil, err
+				}
+				if err = r.BreakLen(fieldLen); err != nil {
+					return nil, err
+				}
+			} else {
+				if err = r.BreakLine(); err != nil {
+					return nil, err
+				}
+			}
+			endPos, err := r.NowIndex()
+			if err != nil {
+				return nil, err
+			}
+			result[name] = &FieldInfo{
+				name:     name,
+				startPos: startPos,
+				endPos:   endPos,
+				len:      endPos - startPos,
+			}
+		}
+		if eleFieldType == FieldTypeString {
+			if err = r.BreakLine(); err != nil {
+				return nil, err
+			}
+		}
+		return result, nil
+	}
+
+	return unmarshalObj2FieldInfoMap(r, fieldType)
+}
+
+func unmarshalObj2FieldInfoMap(r *readDataFns, fieldType FieldType) (map[string]*FieldInfo, error) {
+	if fieldType == FieldTypeList {
+		return unmarshal2FieldInfoMap(r, fieldType)
+	}
+
+	if fieldType != FieldTypeStruct {
+		return nil, errors.New("不支持非Obj或Array的顶层结构")
+	}
+
+	fieldNum, err := r.ReadFieldLen()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]*FieldInfo)
+	for i := int64(0); i < fieldNum; i++ {
+		name, err := r.ReadLine()
+		if err != nil {
+			return nil, err
+		}
+
+		eleFieldType, err := r.ReadFieldType()
+		if err != nil {
+			return nil, err
+		}
+
+		startPos, err := r.NowIndex()
+		if err != nil {
+			return nil, err
+		}
+
+		if eleFieldType == FieldTypeStruct || eleFieldType == FieldTypeList {
+			childrenMap, err := unmarshal2FieldInfoMap(r, eleFieldType)
+			if err != nil {
+				return nil, err
+			}
+			endPos, err := r.NowIndex()
+			if err != nil {
+				return nil, err
+			}
+			result[name] = &FieldInfo{
+				name:     name,
+				startPos: startPos,
+				endPos:   endPos,
+				len:      endPos - startPos,
+				children: childrenMap,
+			}
+			continue
+		}
+
+
+		if eleFieldType == FieldTypeString {
+			fieldLen, err := r.ReadFieldLen()
+			if err != nil {
+				return nil, err
+			}
+			if err = r.BreakLen(fieldLen); err != nil {
+				return nil, err
+			}
+		} else {
+			if err = r.BreakLine(); err != nil {
+				return nil, err
+			}
+		}
+		endPos, err := r.NowIndex()
+		if err != nil {
+			return nil, err
+		}
+		result[name] = &FieldInfo{
+			name:     name,
+			startPos: startPos,
+			endPos:   endPos,
+			len:      endPos - startPos,
+		}
+	}
+	return result, err
+}
+
 func UnmarshalByFilePath(s string, v interface{}) error {
 	file, err := os.OpenFile(s, os.O_RDONLY, 0666)
 	if err != nil {
@@ -201,11 +437,6 @@ func UnmarshalByFilePath(s string, v interface{}) error {
 }
 
 func Unmarshal(f *os.File, v interface{}) error {
-	defer f.Close()
-	return unmarshalByBufIoReader(bufio.NewReader(f), v)
-}
-
-func unmarshalByBufIoReader(reader *bufio.Reader, v interface{}) error {
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Ptr || val.IsNil() {
 		return errors.New("请传入对象地址")
@@ -218,16 +449,16 @@ func unmarshalByBufIoReader(reader *bufio.Reader, v interface{}) error {
 		rt = rt.Elem()
 	}
 
-	return unmarshal(val, rt, reader, true)
+	return unmarshal(val, rt, f, true)
 }
 
-func unmarshal(val reflect.Value, rt reflect.Type, reader *bufio.Reader, readStructType bool) error {
+func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bool) error {
 	if rt.Kind() == reflect.Struct {
-		return unmarshalStruct(reader, rt, val, readStructType)
+		return unmarshalStruct(f, rt, val, readStructType)
 	}
 
 	if rt.Kind() == reflect.Slice {
-		return unmarshalTopSlice(reader, rt, val)
+		return unmarshalTopSlice(f, rt, val)
 	}
 
 	if rt.Kind() != reflect.Map {
@@ -240,12 +471,12 @@ func unmarshal(val reflect.Value, rt reflect.Type, reader *bufio.Reader, readStr
 	}
 
 	if readStructType {
-		fieldTypeStr, _, err := reader.ReadLine()
+		fieldTypeStr, err := readLine(f)
 		if err != nil {
 			return err
 		}
 
-		fieldTypeInt, err := strconv.ParseInt(string(fieldTypeStr), 10, 64)
+		fieldTypeInt, err := strconv.ParseInt(fieldTypeStr, 10, 64)
 		if err != nil {
 			return errors.New("转换命令码失败")
 		}
@@ -255,7 +486,7 @@ func unmarshal(val reflect.Value, rt reflect.Type, reader *bufio.Reader, readStr
 		}
 	}
 
-	fieldNumStr, _, err := reader.ReadLine()
+	fieldNumStr, err := readLine(f)
 	if err != nil {
 		return err
 	}
@@ -269,22 +500,21 @@ func unmarshal(val reflect.Value, rt reflect.Type, reader *bufio.Reader, readStr
 		val = val.Elem()
 	}
 	for i := int64(0); i < fieldNum; i++ {
-		nameBytes, _, err := reader.ReadLine()
+		name, err := readLine(f)
 		if err == io.EOF {
 			return nil
 		}
-		name := string(nameBytes)
 
 		if err != nil {
 			return errors.New("获取数据字段名称失败")
 		}
 
-		fieldTypeStr, _, err := reader.ReadLine()
+		fieldTypeStr, err := readLine(f)
 		if err != nil {
 			return errors.New("获取字段类型失败")
 		}
 
-		fieldTypeInt, err := strconv.ParseInt(string(fieldTypeStr), 10, 64)
+		fieldTypeInt, err := strconv.ParseInt(fieldTypeStr, 10, 64)
 		if err != nil {
 			return errors.New("转换字段类型失败")
 		}
@@ -292,7 +522,7 @@ func unmarshal(val reflect.Value, rt reflect.Type, reader *bufio.Reader, readStr
 		fieldType := FieldType(fieldTypeInt)
 
 		tmpV := reflect.New(rt.Elem()).Elem()
-		if err = settingVal(fieldType, tmpV, reader); err != nil {
+		if err = settingVal(fieldType, tmpV, f); err != nil {
 			return err
 		}
 		val.SetMapIndex(reflect.ValueOf(name), tmpV)
@@ -308,9 +538,9 @@ func getInterfaceFieldName(field *reflect.StructField) string {
 	return field.Name
 }
 
-func unmarshalTopSlice(reader *bufio.Reader, rt reflect.Type, rv reflect.Value) error {
+func unmarshalTopSlice(f *os.File, rt reflect.Type, rv reflect.Value) error {
 	for {
-		fieldTypeStr, _, err := reader.ReadLine()
+		fieldTypeStr, err := readLine(f)
 		if err == io.EOF {
 			return nil
 		}
@@ -323,7 +553,7 @@ func unmarshalTopSlice(reader *bufio.Reader, rt reflect.Type, rv reflect.Value) 
 			return errors.New("获取字段类型失败")
 		}
 
-		fieldTypeInt, err := strconv.ParseInt(string(fieldTypeStr), 10, 64)
+		fieldTypeInt, err := strconv.ParseInt(fieldTypeStr, 10, 64)
 		if err != nil {
 			return errors.New("转换字段类型失败")
 		}
@@ -334,20 +564,20 @@ func unmarshalTopSlice(reader *bufio.Reader, rt reflect.Type, rv reflect.Value) 
 			return errors.New("类型无法进行匹配")
 		}
 
-		settingVal(fieldType, rv, reader)
+		settingVal(fieldType, rv, f)
 	}
 }
 
-func unmarshalStruct(reader *bufio.Reader, rt reflect.Type, rv reflect.Value, readStructType bool) error {
+func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructType bool) error {
 	for rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
 	}
 	if readStructType {
-		fieldTypeStr, _, err := reader.ReadLine()
+		fieldTypeStr, err := readLine(f)
 		if err != nil {
 			return err
 		}
-		fieldTypeNum, err := strconv.ParseInt(string(fieldTypeStr), 10, 64)
+		fieldTypeNum, err := strconv.ParseInt(fieldTypeStr, 10, 64)
 		if err != nil {
 			return errors.New("获取数据类型失败")
 		}
@@ -371,11 +601,11 @@ func unmarshalStruct(reader *bufio.Reader, rt reflect.Type, rv reflect.Value, re
 		}
 	}
 
-	fieldLenStr, _, err := reader.ReadLine()
+	fieldLenStr, err := readLine(f)
 	if err != nil {
 		return errors.New("获取字段个数失败")
 	}
-	fieldLen, err := strconv.ParseInt(string(fieldLenStr), 10, 64)
+	fieldLen, err := strconv.ParseInt(fieldLenStr, 10, 64)
 	if err != nil {
 		return errors.New("转换字段个数失败")
 	}
@@ -387,7 +617,7 @@ func unmarshalStruct(reader *bufio.Reader, rt reflect.Type, rv reflect.Value, re
 		if settingFieldNum > fieldLen {
 			return nil
 		}
-		name, _, err := reader.ReadLine()
+		name, err := readLine(f)
 		if err == io.EOF {
 			return nil
 		}
@@ -396,36 +626,37 @@ func unmarshalStruct(reader *bufio.Reader, rt reflect.Type, rv reflect.Value, re
 			return errors.New("获取数据字段名称失败")
 		}
 
-		fieldTypeStr, _, err := reader.ReadLine()
+		fieldTypeStr, err := readLine(f)
 		if err != nil {
 			return errors.New("获取字段类型失败")
 		}
 
-		fieldTypeInt, err := strconv.ParseInt(string(fieldTypeStr), 10, 64)
+		fieldTypeInt, err := strconv.ParseInt(fieldTypeStr, 10, 64)
 		if err != nil {
 			return errors.New("转换字段类型失败")
 		}
 
 		fieldType := FieldType(fieldTypeInt)
 
-		info, ok := tmpFieldMap[string(name)]
+		info, ok := tmpFieldMap[name]
 		if !ok {
 			if fieldType == FieldTypeString {
-				dataLenStr, _, err := reader.ReadLine()
+				dataLenStr, err := readLine(f)
 				if err != nil {
 					return errors.New("获取数据长度失败")
 				}
 
-				dataLen, err := strconv.ParseInt(string(dataLenStr), 10, 64)
+				dataLen, err := strconv.ParseInt(dataLenStr, 10, 64)
 				if err != nil {
 					return errors.New("转换数据长度失败")
 				}
-				_, err = reader.Discard(int(dataLen))
+				_, err = f.Seek(dataLen, 1)
+				//_, err = reader.Discard(int(dataLen))
 				if err != nil {
 					return err
 				}
 			} else if fieldType == FieldTypeList {
-				eleLenStr, _, err := reader.ReadLine()
+				eleLenStr, err := readLine(f)
 				if err != nil {
 					return err
 				}
@@ -436,14 +667,14 @@ func unmarshalStruct(reader *bufio.Reader, rt reflect.Type, rv reflect.Value, re
 				}
 				if info.value.Elem().Kind() != reflect.String {
 					for i := 0; i < int(eleLen); i++ {
-						_, _, err = reader.ReadLine()
+						_, err = readLine(f)
 						if err != nil {
 							return err
 						}
 					}
 				} else {
 					for i := 0; i < int(eleLen); i++ {
-						lineStr, _, err := reader.ReadLine()
+						lineStr, err := readLine(f)
 						if err != nil {
 							return err
 						}
@@ -451,16 +682,17 @@ func unmarshalStruct(reader *bufio.Reader, rt reflect.Type, rv reflect.Value, re
 						if err != nil {
 							return errors.New("获取数据长度失败")
 						}
-						reader.Discard(int(dataLen))
+						f.Seek(dataLen, 1)
+						//reader.Discard(int(dataLen))
 					}
-					_, _, err = reader.ReadLine()
+					_, err = readLine(f)
 					if err != nil {
 						return err
 					}
 				}
 
 			} else {
-				_, _, err = reader.ReadLine()
+				_, err = readLine(f)
 				if err != nil {
 					return err
 				}
@@ -469,13 +701,13 @@ func unmarshalStruct(reader *bufio.Reader, rt reflect.Type, rv reflect.Value, re
 			continue
 		}
 
-		if err = settingVal(fieldType, info.value, reader); err != nil {
+		if err = settingVal(fieldType, info.value, f); err != nil {
 			return err
 		}
 	}
 }
 
-func settingVal(fieldTpe FieldType, val reflect.Value, reader *bufio.Reader) error {
+func settingVal(fieldTpe FieldType, val reflect.Value, f *os.File) error {
 	t := val.Type()
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -484,46 +716,46 @@ func settingVal(fieldTpe FieldType, val reflect.Value, reader *bufio.Reader) err
 	var fieldData reflect.Value
 	switch fieldTpe {
 	case FieldTypeString:
-		data, err := readStringData(reader)
+		data, err := readStringData(f)
 		if err != nil {
 			return err
 		}
 		fieldData = reflect.ValueOf(data)
 	case FieldTypeInteger:
-		data, err := readIntData(reader)
+		data, err := readIntData(f)
 		if err != nil {
 			return err
 		}
 		fieldData = reflect.ValueOf(data)
 	case FieldTypeDouble:
-		double, err := readDouble(reader)
+		double, err := readDouble(f)
 		if err != nil {
 			return err
 		}
 		fieldData = reflect.ValueOf(double)
 	case FieldTypeBool:
-		data, err := readBool(reader)
+		data, err := readBool(f)
 		if err != nil {
 			return err
 		}
 		fieldData = reflect.ValueOf(data)
 	case FieldTypeList:
-		eleLenStr, _, err := reader.ReadLine()
+		eleLenStr, err := readLine(f)
 		if err != nil {
 			return err
 		}
-		eleLenInt64, err := strconv.ParseInt(string(eleLenStr), 10, 64)
+		eleLenInt64, err := strconv.ParseInt(eleLenStr, 10, 64)
 		if err != nil {
 			return errors.New("获取Slice长度失败")
 		}
 
 		eleLen := int(eleLenInt64)
 
-		tmpFieldTypeStr, _, err := reader.ReadLine()
+		tmpFieldTypeStr, err := readLine(f)
 		if err != nil {
 			return err
 		}
-		tmpFieldTypeNum, err := strconv.ParseInt(string(tmpFieldTypeStr), 10, 64)
+		tmpFieldTypeNum, err := strconv.ParseInt(tmpFieldTypeStr, 10, 64)
 		if err != nil {
 			return errors.New("换换类型失败")
 		}
@@ -541,7 +773,7 @@ func settingVal(fieldTpe FieldType, val reflect.Value, reader *bufio.Reader) err
 		for i := 0; i < eleLen; i++ {
 
 			tmpV := reflect.New(tmpElem)
-			if err = settingVal(tmpFieldType, tmpV.Elem(), reader); err != nil {
+			if err = settingVal(tmpFieldType, tmpV.Elem(), f); err != nil {
 				return err
 			}
 
@@ -555,7 +787,7 @@ func settingVal(fieldTpe FieldType, val reflect.Value, reader *bufio.Reader) err
 		val.Set(slice)
 
 		if tmpFieldType == FieldTypeString {
-			_, _, err = reader.ReadLine()
+			_, err = readLine(f)
 			if err != nil {
 				return err
 			}
@@ -579,7 +811,7 @@ func settingVal(fieldTpe FieldType, val reflect.Value, reader *bufio.Reader) err
 		if val.Kind() != reflect.Ptr {
 			val.Set(newT)
 		}
-		return unmarshal(val, t, reader, false)
+		return unmarshal(val, t, f, false)
 	default:
 		return errors.New("获取字段类型失败")
 	}
@@ -588,8 +820,8 @@ func settingVal(fieldTpe FieldType, val reflect.Value, reader *bufio.Reader) err
 	return nil
 }
 
-func readBool(r *bufio.Reader) (bool, error) {
-	tmpBuf, _, err := r.ReadLine()
+func readBool(f *os.File) (bool, error) {
+	tmpBuf, err := readLine(f)
 	if err != nil {
 		return false, errors.New("读取内容失败")
 	}
@@ -600,8 +832,8 @@ func readBool(r *bufio.Reader) (bool, error) {
 	return isTrue, nil
 }
 
-func readDouble(r *bufio.Reader) (float64, error) {
-	tmpBuf, _, err := r.ReadLine()
+func readDouble(f *os.File) (float64, error) {
+	tmpBuf, err := readLine(f)
 	if err != nil {
 		return 0, errors.New("读取内容失败")
 	}
@@ -611,20 +843,19 @@ func readDouble(r *bufio.Reader) (float64, error) {
 	}
 	return float, nil
 }
-func readIntData(r *bufio.Reader) (int64, error) {
-	tmpBuf, _, err := r.ReadLine()
+func readIntData(f *os.File) (int64, error) {
+	tmpBuf, err := readLine(f)
 	if err != nil {
 		return 0, errors.New("读取内容失败")
 	}
-	parseInt, err := strconv.ParseInt(string(tmpBuf), 10, 64)
+	parseInt, err := strconv.ParseInt(tmpBuf, 10, 64)
 	if err != nil {
 		return 0, errors.New("转换数字失败")
 	}
 	return parseInt, nil
 }
-
-func readStringData(r *bufio.Reader) (string, error) {
-	dataLenStr, _, err := r.ReadLine()
+func readStringData(f *os.File) (string, error) {
+	dataLenStr, err := readLine(f)
 	if err != nil {
 		return "", errors.New("获取数据长度失败")
 	}
@@ -634,9 +865,24 @@ func readStringData(r *bufio.Reader) (string, error) {
 		return "", errors.New("转换数据长度失败")
 	}
 	tmpBuf := make([]byte, dataLen, dataLen)
-	_, err = r.Read(tmpBuf)
+	_, err = f.Read(tmpBuf)
 	if err != nil {
 		return "", errors.New("读取内容失败")
 	}
 	return string(tmpBuf), nil
+}
+
+func readLine(f *os.File) (string, error) {
+	buff := &bytes.Buffer{}
+	tmpBuf := make([]byte, 1, 1)
+	for {
+		_, err := f.Read(tmpBuf)
+		if err != nil {
+			return "", err
+		}
+		if tmpBuf[0] == newLine {
+			return buff.String(), nil
+		}
+		buff.Write(tmpBuf)
+	}
 }

@@ -1,14 +1,14 @@
-package websocket
+package conn
 
 import (
 	"bufio"
 	"bytes"
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/conn"
+	"github.com/gorilla/websocket"
 	"io"
 )
 
 type bufWebsocketReader struct {
-	conn      *conn.ConnectionBuf
+	conn      *websocket.Conn
 	bufReader *bufio.Reader
 	tmpMsg    *bytes.Buffer
 }
@@ -67,7 +67,7 @@ ConnectHeader:
 	return readLen, nil
 }
 
-func newBufWebsocketReader(conn *conn.ConnectionBuf) *bufWebsocketReader {
+func newBufWebsocketReader(conn *websocket.Conn) *bufWebsocketReader {
 	return &bufWebsocketReader{
 		conn:   conn,
 		tmpMsg: &bytes.Buffer{},

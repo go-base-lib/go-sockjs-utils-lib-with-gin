@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"unicode/utf8"
 )
 
 type fieldReflectInfo struct {
@@ -24,10 +26,6 @@ type ErrorMsg struct {
 
 func (e *ErrorMsg) Error() string {
 	return e.Msg
-}
-
-func (e ErrorMsg) RuntimeError() {
-	panic("implement me")
 }
 
 const newLine = '\n'
@@ -105,6 +103,29 @@ func Marshal(v interface{}) (p string, err error) {
 	return tmpFile.Name(), marshal2File(reflect.TypeOf(v), reflect.ValueOf(v), writer, true)
 }
 
+func MarshalErr(code, msg string) (string, error) {
+	tmpDir := filepath.Join(os.TempDir(), "devPlatform")
+	_ = os.MkdirAll(tmpDir, 0777)
+	tmpFile, err := ioutil.TempFile(tmpDir, "*")
+	if err != nil {
+		return "", errors.New("创建数据文件失败")
+	}
+	defer func() {
+		if err != nil {
+			os.RemoveAll(tmpDir)
+		}
+	}()
+	defer tmpFile.Close()
+	tmpFile.WriteString(strconv.FormatInt(int64(FieldTypeError), 10))
+	tmpFile.WriteString("\n")
+	tmpFile.WriteString(code)
+	tmpFile.WriteString("\n")
+	tmpFile.WriteString(strconv.FormatInt(int64(utf8.RuneCountInString(msg)), 10))
+	tmpFile.WriteString("\n")
+	tmpFile.WriteString(msg)
+	return tmpFile.Name(), nil
+}
+
 func marshal2File(rt reflect.Type, rv reflect.Value, writer *bufio.Writer, writeStructType bool) error {
 	for {
 		if rt.Kind() == reflect.Ptr {
@@ -115,12 +136,16 @@ func marshal2File(rt reflect.Type, rv reflect.Value, writer *bufio.Writer, write
 		break
 	}
 
+	if rt.Kind() == reflect.Slice {
+		return marshalSlice(rt, rv, writer)
+	}
+
 	if rt.Kind() == reflect.Struct {
 		return marshalStruct(rt, rv, writer, writeStructType)
-	} else if rt.Kind() == reflect.Slice {
-		return marshalSlice(rt, rv, writer)
-	} else if rt.Kind() != reflect.Map {
-		return errors.New("不支持的类型")
+	}
+
+	if rt.Kind() != reflect.Map {
+		return marshalByFieldVal(rt, rv, writer, true)
 	}
 
 	mapRange := rv.MapRange()
@@ -211,24 +236,15 @@ func marshalByFieldVal(t reflect.Type, fieldVal reflect.Value, writer *bufio.Wri
 	switch fieldType {
 	case FieldTypeString:
 		str := fieldVal.String()
-		strLen := len(str)
-		writer.WriteString(strconv.FormatInt(int64(strLen), 10))
-		writer.WriteRune(newLine)
+		strLen := utf8.RuneCountInString(str)
+		writer.WriteString(fmt.Sprintln(strLen))
 		writer.WriteString(str)
 	case FieldTypeBool:
-		b := fieldVal.Bool()
-		writer.WriteString(strconv.FormatBool(b))
-		writer.WriteRune(newLine)
+		fallthrough
 	case FieldTypeInteger:
-		iVal := fieldVal.Int()
-		str := strconv.FormatInt(iVal, 10)
-		writer.WriteString(str)
-		writer.WriteRune(newLine)
+		fallthrough
 	case FieldTypeDouble:
-		fVal := fieldVal.Float()
-		str := strconv.FormatFloat(fVal, 'g', 12, 64)
-		writer.WriteString(str)
-		writer.WriteRune(newLine)
+		writer.WriteString(fmt.Sprintln(fieldVal.Interface()))
 	case FieldTypeStruct, FieldTypeList:
 		return marshal2File(t, fieldVal, writer, writeType)
 	default:
@@ -314,7 +330,6 @@ func unmarshal2FieldInfoMap(r *readDataFns, fieldType FieldType) (map[string]*Fi
 				continue
 			}
 
-
 			if eleFieldType == FieldTypeString {
 				fieldLen, err := r.ReadFieldLen()
 				if err != nil {
@@ -399,7 +414,6 @@ func unmarshalObj2FieldInfoMap(r *readDataFns, fieldType FieldType) (map[string]
 			}
 			continue
 		}
-
 
 		if eleFieldType == FieldTypeString {
 			fieldLen, err := r.ReadFieldLen()
@@ -661,7 +675,7 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 					return err
 				}
 
-				eleLen, err := strconv.ParseInt(string(eleLenStr), 10, 64)
+				eleLen, err := strconv.ParseInt(eleLenStr, 10, 64)
 				if err != nil {
 					return errors.New("读取数据长度失败")
 				}
@@ -860,16 +874,13 @@ func readStringData(f *os.File) (string, error) {
 		return "", errors.New("获取数据长度失败")
 	}
 
-	dataLen, err := strconv.ParseInt(string(dataLenStr), 10, 64)
+	dataLen, err := strconv.ParseInt(dataLenStr, 10, 64)
 	if err != nil {
 		return "", errors.New("转换数据长度失败")
 	}
-	tmpBuf := make([]byte, dataLen, dataLen)
-	_, err = f.Read(tmpBuf)
-	if err != nil {
-		return "", errors.New("读取内容失败")
-	}
-	return string(tmpBuf), nil
+
+	str, err := readLenStr(int(dataLen), f)
+	return str, nil
 }
 
 func readLine(f *os.File) (string, error) {
@@ -885,4 +896,36 @@ func readLine(f *os.File) (string, error) {
 		}
 		buff.Write(tmpBuf)
 	}
+}
+
+func readLenStr(length int, f *os.File) (string, error) {
+	str := ""
+	totalLen := 0
+ReadStrStart:
+	line, err := readLine(f)
+	if err != nil {
+		return "", err
+	}
+	lineRuneArr := []rune(line)
+	totalLen += len(lineRuneArr)
+	if totalLen < length {
+		str += line + "\n"
+		goto ReadStrStart
+	}
+
+	if totalLen > length {
+		overLen := totalLen - length
+		str += string(lineRuneArr[:length])
+		_, err = f.Seek(-int64(overLen+1), 1)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if totalLen == length {
+		f.Seek(-1, 1)
+		str = line
+	}
+
+	return str, nil
 }

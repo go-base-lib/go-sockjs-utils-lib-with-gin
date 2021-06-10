@@ -2,12 +2,11 @@ package websocket
 
 import (
 	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/conn"
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/socket"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
-type HandleFn func(ctx *socket.Context)
+type HandleFn func(ctx *conn.Context)
 
 type Engine struct {
 	*gin.Engine
@@ -16,6 +15,9 @@ type Engine struct {
 
 // Handle 拦截命令
 func (this *Engine) Handle(cmdStr string, handleFn HandleFn) *Engine {
+	if this.handleMapper == nil {
+		this.handleMapper = make(map[string]HandleFn)
+	}
 	this.handleMapper[cmdStr] = handleFn
 	return this
 }

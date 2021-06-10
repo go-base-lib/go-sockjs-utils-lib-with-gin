@@ -23,3 +23,7 @@ func (this *FieldInfo) StartPos() int64 {
 func (this *FieldInfo) EndPos() int64 {
 	return this.endPos
 }
+
+func (this *FieldInfo) Children() map[string]*FieldInfo {
+	return this.children
+}

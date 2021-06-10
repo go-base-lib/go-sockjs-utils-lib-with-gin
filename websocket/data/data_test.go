@@ -84,7 +84,7 @@ func TestMarshalTopArray(t *testing.T) {
 	}
 	tmpData := make([]*tmpStruct, 0, 8)
 	tmpData = append(tmpData, &tmpStruct{
-		A: "hahah1",
+		A: "哈哈1",
 		B: &struct {
 			C []string `socket:"c"`
 			D string   `socket:"d"`
@@ -92,69 +92,69 @@ func TestMarshalTopArray(t *testing.T) {
 		D: true,
 		E: 11,
 	})
-	tmpData = append(tmpData, &tmpStruct{
-		A: "hahah2",
-		B: &struct {
-			C []string `socket:"c"`
-			D string   `socket:"d"`
-		}{C: []string{"hello", "world"}, D: "asd"},
-		D: true,
-		E: 12,
-	})
-	tmpData = append(tmpData, &tmpStruct{
-		A: "hahah3",
-		B: &struct {
-			C []string `socket:"c"`
-			D string   `socket:"d"`
-		}{C: []string{"hello", "world"}, D: "asd"},
-		D: true,
-		E: 13,
-	})
-	tmpData = append(tmpData, &tmpStruct{
-		A: "hahah4",
-		B: &struct {
-			C []string `socket:"c"`
-			D string   `socket:"d"`
-		}{C: []string{"hello", "world"}, D: "asd"},
-		D: true,
-		E: 14,
-	})
-	tmpData = append(tmpData, &tmpStruct{
-		A: "hahah5",
-		B: &struct {
-			C []string `socket:"c"`
-			D string   `socket:"d"`
-		}{C: []string{"hello", "world"}, D: "asd"},
-		D: true,
-		E: 15,
-	})
-	tmpData = append(tmpData, &tmpStruct{
-		A: "hahah6",
-		B: &struct {
-			C []string `socket:"c"`
-			D string   `socket:"d"`
-		}{C: []string{"hello", "world"}, D: "asd"},
-		D: true,
-		E: 16,
-	})
-	tmpData = append(tmpData, &tmpStruct{
-		A: "hahah7",
-		B: &struct {
-			C []string `socket:"c"`
-			D string   `socket:"d"`
-		}{C: []string{"hello", "world"}, D: "asd"},
-		D: true,
-		E: 17,
-	})
-	tmpData = append(tmpData, &tmpStruct{
-		A: "hahah8",
-		B: &struct {
-			C []string `socket:"c"`
-			D string   `socket:"d"`
-		}{C: []string{"hello", "world"}, D: "asd"},
-		D: true,
-		E: 18,
-	})
+	//tmpData = append(tmpData, &tmpStruct{
+	//	A: "hahah2",
+	//	B: &struct {
+	//		C []string `socket:"c"`
+	//		D string   `socket:"d"`
+	//	}{C: []string{"hello", "world"}, D: "asd"},
+	//	D: true,
+	//	E: 12,
+	//})
+	//tmpData = append(tmpData, &tmpStruct{
+	//	A: "hahah3",
+	//	B: &struct {
+	//		C []string `socket:"c"`
+	//		D string   `socket:"d"`
+	//	}{C: []string{"hello", "world"}, D: "asd"},
+	//	D: true,
+	//	E: 13,
+	//})
+	//tmpData = append(tmpData, &tmpStruct{
+	//	A: "hahah4",
+	//	B: &struct {
+	//		C []string `socket:"c"`
+	//		D string   `socket:"d"`
+	//	}{C: []string{"hello", "world"}, D: "asd"},
+	//	D: true,
+	//	E: 14,
+	//})
+	//tmpData = append(tmpData, &tmpStruct{
+	//	A: "hahah5",
+	//	B: &struct {
+	//		C []string `socket:"c"`
+	//		D string   `socket:"d"`
+	//	}{C: []string{"hello", "world"}, D: "asd"},
+	//	D: true,
+	//	E: 15,
+	//})
+	//tmpData = append(tmpData, &tmpStruct{
+	//	A: "hahah6",
+	//	B: &struct {
+	//		C []string `socket:"c"`
+	//		D string   `socket:"d"`
+	//	}{C: []string{"hello", "world"}, D: "asd"},
+	//	D: true,
+	//	E: 16,
+	//})
+	//tmpData = append(tmpData, &tmpStruct{
+	//	A: "hahah7",
+	//	B: &struct {
+	//		C []string `socket:"c"`
+	//		D string   `socket:"d"`
+	//	}{C: []string{"hello", "world"}, D: "asd"},
+	//	D: true,
+	//	E: 17,
+	//})
+	//tmpData = append(tmpData, &tmpStruct{
+	//	A: "hahah8",
+	//	B: &struct {
+	//		C []string `socket:"c"`
+	//		D string   `socket:"d"`
+	//	}{C: []string{"hello", "world"}, D: "asd"},
+	//	D: true,
+	//	E: 18,
+	//})
 	p, err := Marshal(tmpData)
 	if err != nil {
 		panic(err)
@@ -189,4 +189,14 @@ func TestMarshalStrArr(t *testing.T) {
 	}
 
 	fmt.Println(readTmpData)
+}
+
+func TestMarshalTopType(t *testing.T) {
+	data, err := Marshal("哈哈123")
+	if err != nil {
+		panic(err)
+	}
+	d, _ := ioutil.ReadFile(data)
+	os.RemoveAll(data)
+	fmt.Println(string(d))
 }

@@ -41,6 +41,9 @@ func (this *engineHandle) readLoop() {
 	this.wsConnBuf.SetReadLimit(maxMessageSize)
 	_ = this.wsConnBuf.SetReadDeadline(time.Time{})
 	this.wsConnBuf.SetPongHandler(func(string) error { _ = this.wsConnBuf.SetReadDeadline(time.Time{}); return nil })
+	if hookFn, ok := this.hookMapper[HookNameOpen]; ok {
+		go hookFn(this)
+	}
 	for {
 		context, err := this.readMsgContext()
 		if err == io.EOF {

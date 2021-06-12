@@ -44,9 +44,6 @@ func (this *Engine) handleWs(wsConn *websocket.Conn) {
 		wsConnBuf: conn.NewConnectionBuf(wsConn),
 	}
 	handle.Context = conn.NewWebSocketContext(handle.wsConnBuf, "", false, "", "", "")
-	if hookFn, ok := this.hookMapper[HookNameOpen]; ok {
-		hookFn(handle)
-	}
 	go handle.begin()
 }
 

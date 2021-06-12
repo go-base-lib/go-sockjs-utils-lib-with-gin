@@ -216,6 +216,10 @@ func (this *Context) returnMsgAndRecv(f string) (*Context, error) {
 		this.children = make([]*Context, 0, 8)
 		this.children = append(this.children, c)
 	}
+
+	if c.HaveErr() {
+		return c, c.Err
+	}
 	return c, err
 
 }
@@ -317,6 +321,10 @@ func (this *Context) SendMsgAndReturnWithTimeout(cmd string, modType ModType, se
 	if this.children == nil {
 		this.children = make([]*Context, 0, 8)
 		this.children = append(this.children, c)
+	}
+
+	if c.HaveErr() {
+		return c, c.Err
 	}
 	return c, err
 }

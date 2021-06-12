@@ -52,6 +52,7 @@ func (this *engineHandle) readLoop() {
 			if ok || err == net.ErrClosed {
 				if hookFn, ok := this.hookMapper[HookNameClose]; !ok {
 					hookFn(this)
+					this.Destroy()
 				}
 				return
 			}

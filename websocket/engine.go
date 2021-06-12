@@ -7,7 +7,7 @@ import (
 )
 
 type HandleFn func(ctx *conn.Context) error
-type HookFn func(engine *engineHandle)
+type HookFn func(engine HookContext)
 
 type HookName string
 

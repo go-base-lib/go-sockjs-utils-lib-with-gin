@@ -13,6 +13,11 @@ const (
 	maxMessageSize = 1024 * 1024
 )
 
+type HookContext interface {
+	SendMsgAndReturnWithTimeout(cmd string, modType conn.ModType, sendData interface{}, timeout time.Duration) (*conn.Context, error)
+	SendMsg(cmd string, modType conn.ModType, sendData interface{}) error
+}
+
 type engineHandle struct {
 	*conn.Context
 	*Engine

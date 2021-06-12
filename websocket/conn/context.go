@@ -373,6 +373,10 @@ func (this *Context) Destroy() {
 	}
 }
 
+func (this *Context) CloseConn() {
+	this.wsConn.Close()
+}
+
 func NewWebSocketContext(wsConn *ConnectionBuf, cmd string, needReturn bool, msgId string, mod ModType, filePath string) *Context {
 	context := &Context{
 		wsConn:      wsConn,

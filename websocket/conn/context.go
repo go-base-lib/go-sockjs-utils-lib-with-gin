@@ -233,6 +233,9 @@ func (this *Context) Field(name string) *FieldMsgReader {
 }
 
 func (this *Context) returnMsg(f string) error {
+	if this.mod == "" {
+		return errors.New("空Context只能发送数据无法返回数据")
+	}
 	if !this.needReturn {
 		return errors.New("消息无需返回")
 	}
@@ -371,6 +374,8 @@ func NewWebSocketContext(wsConn *ConnectionBuf, cmd string, needReturn bool, msg
 		needReturn:  needReturn,
 		msgFilePath: filePath,
 	}
-	context.parseFields()
+	if len(filePath) > 0 {
+		context.parseFields()
+	}
 	return context
 }

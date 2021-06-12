@@ -14,6 +14,7 @@ const (
 )
 
 type engineHandle struct {
+	*conn.Context
 	*Engine
 	wsConnBuf *conn.ConnectionBuf
 	//connBufReader *bufWebsocketReader
@@ -45,7 +46,7 @@ func (this *engineHandle) readLoop() {
 			_, ok := err.(*websocket.CloseError)
 			if ok || err == net.ErrClosed {
 				if hookFn, ok := this.hookMapper[HookNameClose]; !ok {
-					hookFn(this.Engine)
+					hookFn(this)
 				}
 				return
 			}

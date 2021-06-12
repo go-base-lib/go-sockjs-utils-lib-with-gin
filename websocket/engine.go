@@ -7,7 +7,7 @@ import (
 )
 
 type HandleFn func(ctx *conn.Context) error
-type HookFn func(engine *Engine)
+type HookFn func(engine *engineHandle)
 
 type HookName string
 
@@ -43,8 +43,9 @@ func (this *Engine) handleWs(wsConn *websocket.Conn) {
 		Engine:    this,
 		wsConnBuf: conn.NewConnectionBuf(wsConn),
 	}
+	handle.Context = conn.NewWebSocketContext(handle.wsConnBuf, "", false, "", "", "")
 	if hookFn, ok := this.hookMapper[HookNameOpen]; ok {
-		hookFn(this)
+		hookFn(handle)
 	}
 	go handle.begin()
 }

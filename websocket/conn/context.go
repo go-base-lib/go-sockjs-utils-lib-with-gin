@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/data"
 	"os"
+	"time"
 )
 
 type readMsgFn func(msgReader *FieldMsgReader)
@@ -57,17 +58,32 @@ type Context struct {
 	// 消息ID
 	msgId string
 	// 传输模式
-	mod string
+	mod ModType
 	// 消息文件路径
 	msgFilePath string
 	// 错误
 	Err error
+	// 返回需要接收的消息超时时间
+	ReturnRecvMsgTimeout time.Duration
 	// 字段位置和长度
 	fieldInfoMap map[string]*data.FieldInfo
 	// 连接
 	wsConn *ConnectionBuf
 	// 是否没有返回值
 	isVoid bool
+	// 是否已经返回
+	isReturn bool
+	// 是否需要返回
+	needReturn bool
+	children   []*Context
+}
+
+func (this *Context) IsReturn() bool {
+	return this.isReturn
+}
+
+func (this *Context) NeedReturn() bool {
+	return this.needReturn
 }
 
 func (this *Context) parseFields() {
@@ -117,12 +133,45 @@ func (this *Context) Unmarshal(v interface{}) error {
 	return data.UnmarshalByFilePath(this.msgFilePath, v)
 }
 
-func (this *Context) ReturnData(v interface{}) (*Context, error) {
+func (this *Context) ReturnData(v interface{}) error {
+	f, err := data.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	stat, err := os.Stat(f)
+	if err != nil {
+		return err
+	}
+
+	if stat.IsDir() {
+		return errors.New("传输文件失败")
+	}
+	return this.returnMsg(f)
+}
+
+func (this *Context) ReturnVoid() error {
+	str, err := data.MarshalVoidStr()
+	if err != nil {
+		return err
+	}
+	return this.returnMsg(str)
+}
+
+func (this *Context) ReturnErr(code, msg string) error {
+	f, err := data.MarshalErr(code, msg)
+	if err != nil {
+		return err
+	}
+	return this.returnMsg(f)
+}
+
+func (this *Context) ReturnDataAndRecv(v interface{}) (*Context, error) {
 	f, err := data.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
-	data.Marshal(v)
+
 	stat, err := os.Stat(f)
 	if err != nil {
 		return nil, err
@@ -131,15 +180,44 @@ func (this *Context) ReturnData(v interface{}) (*Context, error) {
 	if stat.IsDir() {
 		return nil, errors.New("传输文件失败")
 	}
-	return this.returnFileMsg(f)
+	return this.returnMsgAndRecv(f)
 }
 
-func (this *Context) ReturnErr(code, msg string) (*Context, error) {
+func (this *Context) ReturnErrAndRecv(code, msg string) (*Context, error) {
 	f, err := data.MarshalErr(code, msg)
 	if err != nil {
 		return nil, err
 	}
-	return this.returnFileMsg(f)
+	return this.returnMsgAndRecv(f)
+}
+
+func (this *Context) returnMsgAndRecv(f string) (*Context, error) {
+	var (
+		c   *Context
+		err error
+
+		msg = &MsgInfo{
+			Mod:   this.mod,
+			MsgId: this.MsgId(),
+			Data:  f,
+		}
+	)
+
+	this.isReturn = true
+	if this.ReturnRecvMsgTimeout <= 0 {
+		c, err = this.wsConn.SendMsgAndReturnWithTimeOut(msg, this.ReturnRecvMsgTimeout)
+	} else {
+		c, err = this.wsConn.SendMsgAndReturn(msg)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if this.children == nil {
+		this.children = make([]*Context, 0, 8)
+		this.children = append(this.children, c)
+	}
+	return c, err
+
 }
 
 func (this *Context) FieldLen() int {
@@ -154,21 +232,19 @@ func (this *Context) Field(name string) *FieldMsgReader {
 	return NewFieldMsgReader(info, this.msgFilePath)
 }
 
-func (this *Context) returnFileMsg(f string) (*Context, error) {
-	//buffer := bytes.Buffer{}
-	//buffer.WriteRune('\n')
-	//buffer.WriteString(this.MsgId)
-	//buffer.WriteRune('\n')
-	//buffer.WriteString(this.Mod)
-	//buffer.WriteRune('\n')
-	//buffer.WriteString(f)
-	//buffer.WriteRune('\n')
-	//defer buffer.Reset()
-	//if err := this.wsConn.WriteMessage(websocket.TextMessage, buffer.Bytes()); err != nil {
-	//	return err
-	//}
-	//return nil
-	return nil, nil
+func (this *Context) returnMsg(f string) error {
+	if !this.needReturn {
+		return errors.New("消息无需返回")
+	}
+	if this.isReturn {
+		return errors.New("消息已经返回请勿多次返回")
+	}
+	this.isReturn = true
+	return this.wsConn.SendMsg(&MsgInfo{
+		Mod:   this.mod,
+		MsgId: this.MsgId(),
+		Data:  f,
+	})
 }
 
 func (this *Context) Cmd() string {
@@ -179,7 +255,7 @@ func (this *Context) IsVoid() bool {
 	return this.isVoid
 }
 
-func (this *Context) Mod() string {
+func (this *Context) Mod() ModType {
 	return this.mod
 }
 
@@ -191,12 +267,108 @@ func (this *Context) HaveErr() bool {
 	return this.Err != nil
 }
 
-func NewWebSocketContext(wsConn *ConnectionBuf, cmd string, msgId string, mod string, filePath string) *Context {
+func (this *Context) SendMsg(cmd string, modType ModType, sendData interface{}) error {
+	var (
+		f   string
+		err error
+	)
+
+	if sendData == nil {
+		f, err = data.MarshalVoidStr()
+	} else {
+		f, err = data.Marshal(sendData)
+	}
+	if err != nil {
+		return err
+	}
+
+	return this.wsConn.SendMsg(&MsgInfo{
+		Cmd:  cmd,
+		Mod:  modType,
+		Data: f,
+	})
+}
+
+func (this *Context) SendMsgAndReturnWithTimeout(cmd string, modType ModType, sendData interface{}, timeout time.Duration) (*Context, error) {
+	var (
+		f   string
+		err error
+	)
+
+	if sendData == nil {
+		f, err = data.MarshalVoidStr()
+	} else {
+		f, err = data.Marshal(sendData)
+	}
+	if err != nil {
+		return nil, err
+	}
+	c, err := this.wsConn.SendMsgAndReturnWithTimeOut(&MsgInfo{
+		Cmd:  cmd,
+		Mod:  modType,
+		Data: f,
+	}, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if this.children == nil {
+		this.children = make([]*Context, 0, 8)
+		this.children = append(this.children, c)
+	}
+	return c, err
+}
+
+func (this *Context) SendMsgAndReturn(cmd string, modType ModType, sendData interface{}) (*Context, error) {
+	var (
+		f   string
+		err error
+	)
+
+	if sendData == nil {
+		f, err = data.MarshalVoidStr()
+	} else {
+		f, err = data.Marshal(sendData)
+	}
+	if err != nil {
+		return nil, err
+	}
+	c, err := this.wsConn.SendMsgAndReturn(&MsgInfo{
+		Cmd:  cmd,
+		Mod:  modType,
+		Data: f,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if this.children == nil {
+		this.children = make([]*Context, 0, 8)
+		this.children = append(this.children, c)
+	}
+	return c, err
+}
+
+func (this *Context) Destroy() {
+	os.RemoveAll(this.msgFilePath)
+	this.cmd = ""
+	this.mod = ""
+	this.msgFilePath = ""
+	this.wsConn = nil
+	this.fieldInfoMap = nil
+	if this.needReturn && !this.IsReturn() {
+		this.ReturnVoid()
+	}
+	for _, c := range this.children {
+		c.Destroy()
+	}
+}
+
+func NewWebSocketContext(wsConn *ConnectionBuf, cmd string, needReturn bool, msgId string, mod ModType, filePath string) *Context {
 	context := &Context{
 		wsConn:      wsConn,
 		cmd:         cmd,
 		msgId:       msgId,
 		mod:         mod,
+		needReturn:  needReturn,
 		msgFilePath: filePath,
 	}
 	context.parseFields()

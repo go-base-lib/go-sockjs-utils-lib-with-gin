@@ -85,6 +85,23 @@ func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 
 }
 
+func MarshalVoidStr() (string, error) {
+	tmpDir := filepath.Join(os.TempDir(), "devPlatform")
+	_ = os.MkdirAll(tmpDir, 0777)
+	tmpFile, err := ioutil.TempFile(tmpDir, "*")
+	if err != nil {
+		return "", errors.New("创建数据文件失败")
+	}
+	defer func() {
+		if err != nil {
+			os.RemoveAll(tmpDir)
+		}
+	}()
+	defer tmpFile.Close()
+	tmpFile.WriteString(strconv.FormatInt(int64(FieldTypeVoid), 10) + string(newLine))
+	return tmpFile.Name(), nil
+}
+
 func Marshal(v interface{}) (p string, err error) {
 	tmpDir := filepath.Join(os.TempDir(), "devPlatform")
 	_ = os.MkdirAll(tmpDir, 0777)
@@ -467,6 +484,19 @@ func Unmarshal(f *os.File, v interface{}) error {
 }
 
 func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bool) error {
+	fieldType, _, err := marshalType2FieldType(rt)
+	if err != nil {
+		return nil
+	}
+
+	if fieldType == FieldTypeString || fieldType == FieldTypeInteger || fieldType == FieldTypeBool || fieldType == FieldTypeDouble {
+		_, err = readLine(f)
+		if err != nil {
+			return err
+		}
+		return settingVal(fieldType, val, f)
+	}
+
 	if rt.Kind() == reflect.Struct {
 		return unmarshalStruct(f, rt, val, readStructType)
 	}
@@ -888,6 +918,9 @@ func readLine(f *os.File) (string, error) {
 	tmpBuf := make([]byte, 1, 1)
 	for {
 		_, err := f.Read(tmpBuf)
+		if err == io.EOF && buff.Len() > 0 {
+			return buff.String(), nil
+		}
 		if err != nil {
 			return "", err
 		}

@@ -6,7 +6,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type HandleFn func(ctx *conn.Context)
+type HandleFn func(ctx *conn.Context) error
 
 type Engine struct {
 	*gin.Engine

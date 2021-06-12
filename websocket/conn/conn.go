@@ -2,6 +2,8 @@ package conn
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/data"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/websocket"
@@ -14,14 +16,26 @@ import (
 
 const maxMsgSize = 1024 * 1024
 
+type ModType string
+
+const (
+	ModTypeFile ModType = "0"
+	ModTypeMem  ModType = "1"
+)
+
 type MsgInfo struct {
-	Cmd      string
-	Mod      string
-	MsgId    string
-	Len      int64
-	Data     string
-	callback chan *MsgInfo
-	err      chan error
+	Cmd        string
+	Mod        ModType
+	MsgId      string
+	Data       string
+	needReturn bool
+	callback   chan *MsgInfo
+	err        chan error
+	context    *Context
+}
+
+func (this *MsgInfo) NeedReturn() bool {
+	return this.needReturn
 }
 
 type ConnectionBuf struct {
@@ -35,14 +49,10 @@ type ConnectionBuf struct {
 	msgMap        map[string]*MsgInfo
 }
 
-func (this *ConnectionBuf) SendMsg(info *MsgInfo) error {
-	info.err = make(chan error, 1)
-	defer func() { close(info.err) }()
-	this.sendInfo <- info
-	return <-info.err
-}
-
-func (this *ConnectionBuf) SendMsgAndReturn(info *MsgInfo) (*Context, error) {
+func (this *ConnectionBuf) SendMsgAndReturnWithTimeOut(info *MsgInfo, timeout time.Duration) (*Context, error) {
+	if this.sendInfo == nil {
+		return nil, errors.New("连接已断开")
+	}
 	info.err = make(chan error, 1)
 	info.callback = make(chan *MsgInfo, 1)
 	defer func() {
@@ -50,6 +60,52 @@ func (this *ConnectionBuf) SendMsgAndReturn(info *MsgInfo) (*Context, error) {
 		close(info.callback)
 	}()
 
+	this.sendInfo <- info
+	err := <-info.err
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			delete(this.msgMap, info.MsgId)
+			return nil, errors.New("超时")
+		case callback := <-info.callback:
+			if callback == nil {
+				return nil, <-info.err
+			}
+			return NewWebSocketContext(this, callback.Cmd, info.NeedReturn(), callback.MsgId, callback.Mod, callback.Data), nil
+		}
+	}
+}
+
+func (this *ConnectionBuf) SendMsg(info *MsgInfo) error {
+	if this.sendInfo == nil {
+		return errors.New("连接已断开")
+	}
+	defer func() { recover() }()
+	info.err = make(chan error, 1)
+	defer func() { close(info.err) }()
+	this.sendInfo <- info
+	return <-info.err
+}
+
+func (this *ConnectionBuf) SendMsgAndReturn(info *MsgInfo) (*Context, error) {
+	if this.sendInfo == nil {
+		return nil, errors.New("连接已断开")
+	}
+	info.err = make(chan error, 1)
+	info.callback = make(chan *MsgInfo, 1)
+	defer func() { recover() }()
+	defer func() {
+		close(info.err)
+		close(info.callback)
+	}()
+
+	this.sendInfo <- info
 	err := <-info.err
 	if err != nil {
 		return nil, err
@@ -59,7 +115,7 @@ func (this *ConnectionBuf) SendMsgAndReturn(info *MsgInfo) (*Context, error) {
 		return nil, <-info.err
 
 	}
-	return NewWebSocketContext(this, callback.Cmd, callback.MsgId, callback.Mod, callback.Data), nil
+	return NewWebSocketContext(this, callback.Cmd, info.NeedReturn(), callback.MsgId, callback.Mod, callback.Data), nil
 }
 
 func (this *ConnectionBuf) writeLoop() {
@@ -78,16 +134,20 @@ func (this *ConnectionBuf) writeLoop() {
 			info.MsgId = uid.String() + strconv.FormatInt(time.Now().UnixNano(), 10)
 		}
 
+		needStr := "0"
 		if info.callback != nil {
 			this.msgMap[info.MsgId] = info
+			needStr = "1"
 		}
 
 		this.writeBuf.Reset()
 		this.writeBuf.WriteString(info.Cmd)
 		this.writeBuf.WriteRune('\n')
+		this.writeBuf.WriteString(needStr)
+		this.writeBuf.WriteRune('\n')
 		this.writeBuf.WriteString(info.MsgId)
 		this.writeBuf.WriteRune('\n')
-		this.writeBuf.WriteString(info.Mod)
+		this.writeBuf.WriteString(string(info.Mod))
 		this.writeBuf.WriteRune('\n')
 		err := this.WriteMessage(websocket.TextMessage, this.writeBuf.Bytes())
 		if err != nil {
@@ -171,6 +231,11 @@ ReadBegin:
 		return nil, err
 	}
 
+	needReturn, err := this.connBufReader.ReadLine()
+	if err != nil {
+		return nil, err
+	}
+
 	msgId, err := this.connBufReader.ReadLine()
 	if err != nil {
 		return nil, err
@@ -188,12 +253,14 @@ ReadBegin:
 
 	msgFile := ""
 	dataLen := int64(0)
+	mod := ModTypeMem
 	if isFile {
 		filePath, err := this.connBufReader.ReadLine()
 		if err != nil {
 			return nil, err
 		}
 		msgFile = filePath
+		mod = ModTypeFile
 	} else {
 		datLenStr, err := this.connBufReader.ReadLine()
 		if err != nil {
@@ -216,23 +283,23 @@ ReadBegin:
 			d, _ := data.MarshalErr("404", "未知的请求")
 			this.SendMsg(&MsgInfo{
 				MsgId: msgId,
-				Mod:   isFileStr,
+				Mod:   mod,
 				Data:  d,
 			})
 			goto ReadBegin
 		}
 		if msgInfo.callback != nil {
 			delete(this.msgMap, msgId)
-			msgInfo.Mod = isFileStr
-			msgInfo.Len = dataLen
+			msgInfo.Mod = mod
 			msgInfo.MsgId = msgId
 			msgInfo.Data = msgFile
+			msgInfo.needReturn = needReturn == "1"
 			msgInfo.callback <- msgInfo
 		} else {
 			d, _ := data.MarshalErr("404", "未知的返回异常")
 			this.SendMsg(&MsgInfo{
 				MsgId: msgId,
-				Mod:   isFileStr,
+				Mod:   mod,
 				Data:  d,
 			})
 		}
@@ -240,11 +307,11 @@ ReadBegin:
 	}
 
 	return &MsgInfo{
-		Cmd:   cmdUrl,
-		Mod:   isFileStr,
-		Data:  msgFile,
-		Len:   dataLen,
-		MsgId: msgId,
+		Cmd:        cmdUrl,
+		Mod:        mod,
+		Data:       msgFile,
+		MsgId:      msgId,
+		needReturn: needReturn == "1",
 	}, nil
 }
 
@@ -322,6 +389,7 @@ func (this *ConnectionBuf) Close() {
 	}()
 	this.Conn.Close()
 	close(this.sendInfo)
+	this.sendInfo = nil
 }
 
 func NewConnectionBuf(wsConn *websocket.Conn) *ConnectionBuf {

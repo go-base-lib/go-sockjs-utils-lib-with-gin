@@ -3,7 +3,6 @@ package websocket
 import (
 	"fmt"
 	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/conn"
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/data"
 	"github.com/gorilla/websocket"
 	"io"
 	"net"
@@ -57,18 +56,23 @@ func (this *engineHandle) readLoop() {
 			continue
 		}
 
-		handleFn, ok := this.matchCmd(context.Cmd())
-		if !ok {
-			errDataStr, _ := data.MarshalErr("404", "未找到对应请求命令")
-			_ = this.wsConnBuf.SendMsg(&conn.MsgInfo{
-				Mod:   context.Mod(),
-				MsgId: context.MsgId(),
-				Data:  errDataStr,
-			})
-			fmt.Println("404")
-			continue
-		}
-		handleFn(context)
+		go func() {
+			defer context.Destroy()
+			handleFn, ok := this.matchCmd(context.Cmd())
+			if !ok {
+				_ = context.ReturnErr("404", "未找到对应请求命令")
+				fmt.Println("404")
+				return
+			}
+			err = handleFn(context)
+			if err != nil {
+				context.ReturnErr("500", err.Error())
+				return
+			}
+			if context.NeedReturn() && !context.IsReturn() {
+				_ = context.ReturnVoid()
+			}
+		}()
 	}
 }
 
@@ -78,5 +82,5 @@ func (this *engineHandle) readMsgContext() (*conn.Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	return conn.NewWebSocketContext(this.wsConnBuf, info.Cmd, info.MsgId, info.Mod, info.Data), err
+	return conn.NewWebSocketContext(this.wsConnBuf, info.Cmd, info.NeedReturn(), info.MsgId, info.Mod, info.Data), err
 }

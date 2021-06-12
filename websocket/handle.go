@@ -70,6 +70,7 @@ func (this *engineHandle) readLoop() {
 		}
 
 		go func() {
+			defer func() { recover() }()
 			defer context.Destroy()
 			handleFn, ok := this.matchCmd(context.Cmd())
 			if !ok {

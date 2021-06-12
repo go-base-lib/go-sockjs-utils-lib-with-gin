@@ -7,10 +7,26 @@ import (
 )
 
 type HandleFn func(ctx *conn.Context) error
+type HookFn func(engine *Engine)
+
+type HookName string
+
+const (
+	HookNameOpen  HookName = "open"
+	HookNameClose HookName = "close"
+)
 
 type Engine struct {
 	*gin.Engine
 	handleMapper map[string]HandleFn
+	hookMapper   map[HookName]HookFn
+}
+
+func (this *Engine) Hook(name HookName, fn HookFn) {
+	if this.hookMapper == nil {
+		this.hookMapper = make(map[HookName]HookFn, 2)
+	}
+	this.hookMapper[name] = fn
 }
 
 // Handle 拦截命令
@@ -27,7 +43,9 @@ func (this *Engine) handleWs(wsConn *websocket.Conn) {
 		Engine:    this,
 		wsConnBuf: conn.NewConnectionBuf(wsConn),
 	}
-
+	if hookFn, ok := this.hookMapper[HookNameOpen]; ok {
+		hookFn(this)
+	}
 	go handle.begin()
 }
 

@@ -44,6 +44,9 @@ func (this *engineHandle) readLoop() {
 		if err != nil {
 			_, ok := err.(*websocket.CloseError)
 			if ok || err == net.ErrClosed {
+				if hookFn, ok := this.hookMapper[HookNameClose]; !ok {
+					hookFn(this.Engine)
+				}
 				return
 			}
 

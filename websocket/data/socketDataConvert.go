@@ -311,6 +311,34 @@ func Unmarshal2FieldInfoMap(fp string) (map[string]*FieldInfo, error) {
 
 func unmarshal2FieldInfoMap(r *readDataFns, fieldType FieldType) (map[string]*FieldInfo, error) {
 	result := make(map[string]*FieldInfo)
+	if fieldType == FieldTypeString || fieldType == FieldTypeInteger || fieldType == FieldTypeBool || fieldType == FieldTypeDouble {
+		index, err := r.NowIndex()
+		if err != nil {
+			return nil, err
+		}
+
+		fieldInfo := &FieldInfo{
+			name:     "0",
+			startPos: index,
+		}
+		if fieldType == FieldTypeString {
+			fieldLen, err := r.ReadFieldLen()
+			if err != nil {
+				return nil, err
+			}
+			fieldInfo.endPos = fieldLen + 1
+		} else {
+			if err = r.BreakLine(); err != nil {
+				return nil, err
+			}
+			endPos, err := r.NowIndex()
+			if err != nil {
+				return nil, err
+			}
+			fieldInfo.endPos = endPos
+		}
+		result["0"] = fieldInfo
+	}
 	if fieldType == FieldTypeList {
 		listLen, err := r.ReadFieldLen()
 		if err != nil {

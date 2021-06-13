@@ -204,7 +204,7 @@ func (this *Context) returnMsgAndRecv(f string) (*Context, error) {
 	)
 
 	this.isReturn = true
-	if this.ReturnRecvMsgTimeout <= 0 {
+	if this.ReturnRecvMsgTimeout > 0 {
 		c, err = this.wsConn.SendMsgAndReturnWithTimeOut(msg, this.ReturnRecvMsgTimeout)
 	} else {
 		c, err = this.wsConn.SendMsgAndReturn(msg)

@@ -383,7 +383,11 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 
 		if isOk {
 			if otherSize > 0 {
-				this.readLastBuf.WriteString(line[lineLen : lineLen+otherSize])
+				runeLine := []rune(line)[lineLen:]
+				if runeLine[0] == '\n' {
+					runeLine = runeLine[1:]
+				}
+				this.readLastBuf.WriteString(string(runeLine))
 			}
 			return tmpFile.Name(), nil
 		}

@@ -389,8 +389,8 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 }
 
 func (this *ConnectionBuf) Close() {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	//this.lock.Lock()
+	//defer this.lock.Unlock()
 	defer func() {
 		recover()
 	}()

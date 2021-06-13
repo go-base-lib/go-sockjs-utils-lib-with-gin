@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const maxMsgSize = 1024 * 1024
@@ -358,36 +359,29 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 	}
 
 	for {
-		readLen, err := this.connBufReader.Read(this.readBufSlice)
-		//if err == io.EOF {
-		//	_, r, err := this.wsConn.NextReader()
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//	currentBufferReader = bufio.NewReader(r)
-		//	continue
-		//}
-		//readLen, err = this.wsConnReadBuf.Read(this.readBufSlice)
-		//if err != nil {
-		//	return nil, ErrReadMsgContent
-		//}
-		totalReadSize += readLen
-		otherSize := totalReadSize - size
+		line, err := this.connBufReader.ReadLine()
+		if err != nil {
+			return "", err
+		}
+		lineLen := utf8.RuneCountInString(line)
+
+		totalReadSize += lineLen
 		isOk := false
+		otherSize := totalReadSize - size
 		if totalReadSize >= size {
-			readLen -= otherSize
+			lineLen -= otherSize
 			isOk = true
 		}
 
-		readData := this.readBufSlice[:readLen]
-		_, err = tmpFile.Write(readData)
+		//readData := this.readBufSlice[:readLen]
+		_, err = tmpFile.WriteString(line[:lineLen])
 		if err != nil {
 			return "", err
 		}
 
 		if isOk {
 			if otherSize > 0 {
-				this.readLastBuf.Write(this.readBufSlice[readLen : readLen+otherSize])
+				this.readLastBuf.WriteString(line[lineLen : lineLen+otherSize])
 			}
 			return tmpFile.Name(), nil
 		}

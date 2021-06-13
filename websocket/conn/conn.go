@@ -193,6 +193,10 @@ func (this *ConnectionBuf) writeSendData(info *MsgInfo) {
 			info.err <- err
 			return
 		}
+		if err = this.WriteMessage(websocket.TextMessage, []byte(strconv.FormatInt(int64(readLen), 10))); err != nil {
+			info.err <- err
+			return
+		}
 		if err = this.WriteMessage(websocket.TextMessage, this.writeBufSlice[:readLen]); err != nil {
 			info.err <- err
 			return

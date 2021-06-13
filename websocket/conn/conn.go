@@ -15,7 +15,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 )
 
 const maxMsgSize = 1024 * 1024
@@ -365,7 +364,8 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 			return "", err
 		}
 		line += "\n"
-		lineLen := utf8.RuneCountInString(line)
+		lineRune := []rune(line)
+		lineLen := len(lineRune)
 
 		totalReadSize += lineLen
 		isOk := false
@@ -376,14 +376,14 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 		}
 
 		//readData := this.readBufSlice[:readLen]
-		_, err = tmpFile.WriteString(line[:lineLen])
+		_, err = tmpFile.WriteString(string(lineRune[:lineLen]))
 		if err != nil {
 			return "", err
 		}
 
 		if isOk {
 			if otherSize > 0 {
-				runeLine := []rune(line)[lineLen:]
+				runeLine := lineRune[lineLen:]
 				if runeLine[0] == '\n' {
 					runeLine = runeLine[1:]
 				}

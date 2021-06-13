@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -45,7 +46,7 @@ type ConnectionBuf struct {
 	*websocket.Conn
 	sendInfo      chan *MsgInfo
 	connBufReader *bufWebsocketReader
-	readLastBuf   *bytes.Buffer
+	readLastBuf   *strings.Builder
 	writeBuf      *bytes.Buffer
 	readBufSlice  []byte
 	writeBufSlice []byte
@@ -337,21 +338,21 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 
 	totalReadSize := this.readLastBuf.Len()
 	if totalReadSize >= size {
-		lastData := this.readLastBuf.Bytes()
+		lastData := this.readLastBuf.String()
 		writeData := lastData[:size]
 		lastData = lastData[size:]
-		_, err = tmpFile.Write(writeData)
+		_, err = tmpFile.WriteString(writeData)
 		if err != nil {
 			return "", err
 		}
 
 		this.readLastBuf.Reset()
 		if len(lastData) > 0 {
-			this.readLastBuf.Write(lastData)
+			this.readLastBuf.WriteString(lastData)
 		}
 		return tmpFile.Name(), nil
 	} else {
-		_, err = tmpFile.Write(this.readLastBuf.Bytes())
+		_, err = tmpFile.WriteString(this.readLastBuf.String())
 		if err != nil {
 			return "", err
 		}
@@ -363,6 +364,7 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		line += "\n"
 		lineLen := utf8.RuneCountInString(line)
 
 		totalReadSize += lineLen
@@ -423,7 +425,7 @@ func NewConnectionBuf(wsConn *websocket.Conn) *ConnectionBuf {
 		Conn:          wsConn,
 		sendInfo:      make(chan *MsgInfo, 1),
 		connBufReader: newBufWebsocketReader(wsConn),
-		readLastBuf:   &bytes.Buffer{},
+		readLastBuf:   &strings.Builder{},
 		writeBuf:      &bytes.Buffer{},
 		readBufSlice:  make([]byte, maxMsgSize, maxMsgSize),
 		writeBufSlice: make([]byte, maxMsgSize, maxMsgSize),

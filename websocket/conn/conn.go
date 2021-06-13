@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -48,6 +49,7 @@ type ConnectionBuf struct {
 	readBufSlice  []byte
 	writeBufSlice []byte
 	msgMap        map[string]*MsgInfo
+	lock          *sync.Mutex
 }
 
 func (this *ConnectionBuf) SendMsgAndReturnWithTimeOut(info *MsgInfo, timeout time.Duration) (*Context, error) {
@@ -387,12 +389,34 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 }
 
 func (this *ConnectionBuf) Close() {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	defer func() {
 		recover()
 	}()
+
+	if len(this.msgMap) > 0 {
+		for _, v := range this.msgMap {
+			this.closeWaitMsg(v)
+		}
+	}
+
 	this.Conn.Close()
 	close(this.sendInfo)
 	this.sendInfo = nil
+}
+
+func (this *ConnectionBuf) closeWaitMsg(msgInfo *MsgInfo) {
+	defer func() { recover() }()
+	if msgInfo.callback != nil {
+		close(msgInfo.callback)
+	}
+
+	if msgInfo.err != nil {
+		msgInfo.err <- errors.New("连接被关闭")
+		close(msgInfo.err)
+	}
+
 }
 
 func NewConnectionBuf(wsConn *websocket.Conn) *ConnectionBuf {

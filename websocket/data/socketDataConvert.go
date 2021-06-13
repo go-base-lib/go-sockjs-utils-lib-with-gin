@@ -338,6 +338,7 @@ func unmarshal2FieldInfoMap(r *readDataFns, fieldType FieldType) (map[string]*Fi
 			fieldInfo.endPos = endPos
 		}
 		result["0"] = fieldInfo
+		return result, nil
 	}
 	if fieldType == FieldTypeList {
 		listLen, err := r.ReadFieldLen()

@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -316,7 +317,9 @@ ReadBegin:
 }
 
 func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
-	tmpFile, err := ioutil.TempFile("devPlatform", "*")
+	tmpDir := filepath.Join(os.TempDir(), "devPlatform")
+	os.MkdirAll(tmpDir, 0777)
+	tmpFile, err := ioutil.TempFile(tmpDir, "*")
 	if err != nil {
 		return "", err
 	}

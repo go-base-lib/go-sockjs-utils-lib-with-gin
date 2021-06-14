@@ -15,9 +15,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const maxMsgSize = 1024 * 1024
+
+var memDataEndFlag = []byte{'\r', '\n', '0', '\r', '\n'}
 
 type ModType string
 
@@ -194,43 +197,53 @@ func (this *ConnectionBuf) writeSendData(info *MsgInfo) {
 			info.err <- err
 			return
 		}
+
+		sendData := this.writeBufSlice[:readLen]
+		sendDataLen := utf8.RuneCountInString(string(sendData))
 		if err = this.WriteMessage(websocket.TextMessage, bytes.Join([][]byte{
-			[]byte(strconv.FormatInt(int64(readLen), 10)),
+			[]byte(strconv.FormatInt(int64(sendDataLen), 10)),
 			{'\n'},
 		}, nil)); err != nil {
 			info.err <- err
 			return
 		}
-		if err = this.WriteMessage(websocket.TextMessage, this.writeBufSlice[:readLen]); err != nil {
+		if err = this.WriteMessage(websocket.TextMessage, sendData); err != nil {
 			info.err <- err
 			return
 		}
-		return
+	} else {
+		blockSize := int(math.Ceil(float64(stat.Size()) / maxMsgSize))
+		for i := 0; i < blockSize; i++ {
+			readLen, err := file.Read(this.writeBufSlice)
+			if err != nil {
+				info.err <- err
+				return
+			}
+
+			writeMsg := this.writeBufSlice[:readLen]
+			if i == blockSize-1 {
+				if writeMsg[readLen-1] != '\n' {
+					writeMsg = bytes.Join([][]byte{
+						writeMsg,
+						{'\n'},
+					}, nil)
+				}
+			}
+
+			if err = this.WriteMessage(websocket.TextMessage, writeMsg); err != nil {
+				if info.callback != nil {
+					info.err <- err
+				}
+				return
+			}
+		}
 	}
 
-	blockSize := int(math.Ceil(float64(stat.Size()) / maxMsgSize))
-	for i := 0; i < blockSize; i++ {
-		readLen, err := file.Read(this.writeBufSlice)
-		if err != nil {
+	if err = this.WriteMessage(websocket.TextMessage, memDataEndFlag); err != nil {
+		if info.callback != nil {
 			info.err <- err
-			return
 		}
-
-		writeMsg := this.writeBufSlice[:readLen]
-		if i == blockSize-1 {
-			if writeMsg[readLen-1] != '\n' {
-				writeMsg = bytes.Join([][]byte{
-					writeMsg,
-					{'\n'},
-				}, nil)
-			}
-		}
-		if err = this.WriteMessage(websocket.TextMessage, writeMsg); err != nil {
-			if info.callback != nil {
-				info.err <- err
-			}
-			return
-		}
+		return
 	}
 
 }
@@ -263,7 +276,6 @@ ReadBegin:
 	}
 
 	msgFile := ""
-	dataLen := int64(0)
 	mod := ModTypeMem
 	if isFile {
 		filePath, err := this.connBufReader.ReadLine()
@@ -273,16 +285,15 @@ ReadBegin:
 		msgFile = filePath
 		mod = ModTypeFile
 	} else {
-		datLenStr, err := this.connBufReader.ReadLine()
-		if err != nil {
-			return nil, err
-		}
-		dataLen, err = strconv.ParseInt(datLenStr, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-
-		msgFile, err = this.readSizeContentToFile(int(dataLen))
+		//datLenStr, err := this.connBufReader.ReadLine()
+		//if err != nil {
+		//	return nil, err
+		//}
+		//dataLen, err = strconv.ParseInt(datLenStr, 10, 64)
+		//if err != nil {
+		//	return nil, err
+		//}
+		msgFile, err = this.readSizeContentToFile()
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +337,7 @@ ReadBegin:
 	}, nil
 }
 
-func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
+func (this *ConnectionBuf) readSizeContentToFile() (string, error) {
 	tmpDir := filepath.Join(os.TempDir(), "devPlatform")
 	os.MkdirAll(tmpDir, 0777)
 	tmpFile, err := ioutil.TempFile(tmpDir, "*")
@@ -335,64 +346,79 @@ func (this *ConnectionBuf) readSizeContentToFile(size int) (string, error) {
 	}
 	defer tmpFile.Close()
 
-	totalReadSize := this.readLastBuf.Len()
-	if totalReadSize >= size {
-		lastData := this.readLastBuf.String()
-		writeData := lastData[:size]
-		lastData = lastData[size:]
-		_, err = tmpFile.WriteString(writeData)
-		if err != nil {
-			return "", err
-		}
-
-		this.readLastBuf.Reset()
-		if len(lastData) > 0 {
-			this.readLastBuf.WriteString(lastData)
-		}
-		return tmpFile.Name(), nil
-	} else {
-		_, err = tmpFile.WriteString(this.readLastBuf.String())
-		if err != nil {
-			return "", err
-		}
-		this.readLastBuf.Reset()
-	}
-
 	for {
-		line, err := this.connBufReader.ReadLine()
+		readLen, err := this.connBufReader.Read(this.readBufSlice)
 		if err != nil {
 			return "", err
 		}
-		line += "\n"
-		lineRune := []rune(line)
-		lineLen := len(lineRune)
-
-		totalReadSize += lineLen
-		isOk := false
-		otherSize := totalReadSize - size
-		if totalReadSize >= size {
-			lineLen -= otherSize
-			isOk = true
-		}
-
-		//readData := this.readBufSlice[:readLen]
-		_, err = tmpFile.WriteString(string(lineRune[:lineLen]))
-		if err != nil {
-			return "", err
-		}
-
-		if isOk {
-			if otherSize > 0 {
-				runeLine := lineRune[lineLen:]
-				if runeLine[0] == '\n' {
-					runeLine = runeLine[1:]
-				}
-				this.readLastBuf.WriteString(string(runeLine))
-			}
+		readData := this.readBufSlice[:readLen]
+		if bytes.Equal(readData, memDataEndFlag) {
 			return tmpFile.Name(), nil
 		}
 
+		if _, err = tmpFile.Write(readData); err != nil {
+			return "", err
+		}
 	}
+
+	//totalReadSize := this.readLastBuf.Len()
+	//if totalReadSize >= size {
+	//	lastData := this.readLastBuf.String()
+	//	writeData := lastData[:size]
+	//	lastData = lastData[size:]
+	//	_, err = tmpFile.WriteString(writeData)
+	//	if err != nil {
+	//		return "", err
+	//	}
+	//
+	//	this.readLastBuf.Reset()
+	//	if len(lastData) > 0 {
+	//		this.readLastBuf.WriteString(lastData)
+	//	}
+	//	return tmpFile.Name(), nil
+	//} else {
+	//	_, err = tmpFile.WriteString(this.readLastBuf.String())
+	//	if err != nil {
+	//		return "", err
+	//	}
+	//	this.readLastBuf.Reset()
+	//}
+	//
+	//for {
+	//	line, err := this.connBufReader.ReadLine()
+	//	if err != nil {
+	//		return "", err
+	//	}
+	//	line += "\n"
+	//	lineRune := []rune(line)
+	//	lineLen := len(lineRune)
+	//
+	//	totalReadSize += lineLen
+	//	isOk := false
+	//	otherSize := totalReadSize - size
+	//	if totalReadSize >= size {
+	//		lineLen -= otherSize
+	//		isOk = true
+	//	}
+	//
+	//	//readData := this.readBufSlice[:readLen]
+	//	_, err = tmpFile.WriteString(string(lineRune[:lineLen]))
+	//	if err != nil {
+	//		return "", err
+	//	}
+	//
+	//	if isOk {
+	//		if otherSize > 0 {
+	//			runeLine := lineRune[lineLen:]
+	//			if runeLine[0] == '\n' {
+	//				runeLine = runeLine[1:]
+	//			}
+	//			this.readLastBuf.WriteString(string(runeLine))
+	//		}
+	//		return tmpFile.Name(), nil
+	//	}
+
+	//}
 }
 
 func (this *ConnectionBuf) Close() {

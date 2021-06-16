@@ -66,7 +66,6 @@ func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 	if err != nil {
 		return nil, err
 	}
-	msgLenStr = msgLenStr[:len(msgLenStr)-1]
 
 	msgLen, err := strconv.ParseInt(msgLenStr, 10, 64)
 	if err != nil {

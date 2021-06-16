@@ -53,8 +53,9 @@ func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 	if err != nil {
 		return nil, err
 	}
+	fieldType = fieldType[:len(fieldType)-1]
 
-	if string(fieldType) != strconv.FormatInt(int64(FieldTypeError), 10) {
+	if fieldType != strconv.FormatInt(int64(FieldTypeError), 10) {
 		return nil, errors.New("非错误类型")
 	}
 
@@ -62,6 +63,7 @@ func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 	if err != nil {
 		return nil, err
 	}
+	code = code[:len(code)-1]
 
 	msgLenStr, err := bufReader.ReadString(newLine)
 	if err != nil {
@@ -73,15 +75,14 @@ func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 		return nil, errors.New("转换错误消息长度失败")
 	}
 
-	buf := make([]byte, msgLen, msgLen)
-	read, err := bufReader.Read(buf)
+	msg, err := readLenStr(int(msgLen), f)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ErrorMsg{
 		Code: code,
-		Msg:  string(buf[:read]),
+		Msg:  msg,
 	}, nil
 
 }

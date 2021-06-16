@@ -48,24 +48,21 @@ func IsErr(data string) bool {
 
 func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 	defer f.Close()
-	bufReader := bufio.NewReader(f)
-	fieldType, err := bufReader.ReadString(newLine)
+	fieldType, err := readLine(f)
 	if err != nil {
 		return nil, err
 	}
-	fieldType = fieldType[:len(fieldType)-1]
 
 	if fieldType != strconv.FormatInt(int64(FieldTypeError), 10) {
 		return nil, errors.New("非错误类型")
 	}
 
-	code, err := bufReader.ReadString(newLine)
+	code, err := readLine(f)
 	if err != nil {
 		return nil, err
 	}
-	code = code[:len(code)-1]
 
-	msgLenStr, err := bufReader.ReadString(newLine)
+	msgLenStr, err := readLine(f)
 	if err != nil {
 		return nil, err
 	}

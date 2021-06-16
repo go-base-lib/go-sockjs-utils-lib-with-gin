@@ -69,7 +69,7 @@ func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	msgLenStr = msgLenStr[:len(msgLenStr)-1]
 	msgLen, err := strconv.ParseInt(msgLenStr, 10, 64)
 	if err != nil {
 		return nil, errors.New("转换错误消息长度失败")

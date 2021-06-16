@@ -355,6 +355,10 @@ func (this *Context) SendMsgAndReturn(cmd string, modType ModType, sendData inte
 		this.children = make([]*Context, 0, 8)
 		this.children = append(this.children, c)
 	}
+
+	if c.HaveErr() {
+		return c, c.Err
+	}
 	return c, err
 }
 

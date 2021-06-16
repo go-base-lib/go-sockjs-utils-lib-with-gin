@@ -49,7 +49,7 @@ func IsErr(data string) bool {
 func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 	defer f.Close()
 	bufReader := bufio.NewReader(f)
-	fieldType, err := bufReader.ReadByte()
+	fieldType, err := bufReader.ReadString(newLine)
 	if err != nil {
 		return nil, err
 	}

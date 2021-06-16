@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -192,6 +193,9 @@ func marshalSlice(rt reflect.Type, rv reflect.Value, writer *bufio.Writer) error
 	writer.WriteRune(newLine)
 	writer.WriteString(strconv.FormatInt(int64(sliceLen), 10))
 	writer.WriteRune(newLine)
+	if sliceLen == 0 {
+		return nil
+	}
 	sonFieldType := rt.Elem()
 	_, fieldTypeStr, err := marshalType2FieldType(sonFieldType)
 	if err != nil {
@@ -218,12 +222,46 @@ func marshalStruct(rt reflect.Type, rv reflect.Value, writer *bufio.Writer, writ
 		writer.WriteRune(newLine)
 	}
 
-	writer.WriteString(strconv.FormatInt(int64(fieldNum), 10))
-	writer.WriteRune(newLine)
+	//writer.WriteString(strconv.FormatInt(int64(fieldNum), 10))
+	//writer.WriteRune(newLine)
+	tmpFieldMap := make(map[string]*fieldReflectInfo, fieldNum)
 	for i := 0; i < fieldNum; i++ {
 		field := rt.Field(i)
 		fieldVal := rv.Field(i)
 		name := getInterfaceFieldName(&field)
+		if name == "" {
+			continue
+		}
+		split := strings.Split(name, ",")
+		marshalZero := true
+		if len(split) == 2 {
+			name = split[0]
+			if split[1] == "omitempty" {
+				marshalZero = false
+			}
+		}
+
+		if !marshalZero && fieldVal.IsZero() {
+			continue
+		}
+		tmpFieldMap[name] = &fieldReflectInfo{
+			value: fieldVal,
+			field: field,
+		}
+
+	}
+
+	if len(tmpFieldMap) == 0 {
+		writer.WriteString("0")
+		writer.WriteRune(newLine)
+		return nil
+	}
+
+	writer.WriteString(strconv.FormatInt(int64(len(tmpFieldMap)), 10))
+	writer.WriteRune(newLine)
+	for name, fieldInfo := range tmpFieldMap {
+		field := fieldInfo.field
+		fieldVal := fieldInfo.value
 		writer.WriteString(name)
 		writer.WriteRune(newLine)
 		t := field.Type
@@ -345,6 +383,9 @@ func unmarshal2FieldInfoMap(r *readDataFns, fieldType FieldType) (map[string]*Fi
 		if err != nil {
 			return nil, err
 		}
+		if listLen == 0 {
+			return nil, err
+		}
 		eleFieldType, err := r.ReadFieldType()
 		if err != nil {
 			return nil, err
@@ -422,6 +463,10 @@ func unmarshalObj2FieldInfoMap(r *readDataFns, fieldType FieldType) (map[string]
 
 	fieldNum, err := r.ReadFieldLen()
 	if err != nil {
+		return nil, err
+	}
+
+	if fieldNum == 0 {
 		return nil, err
 	}
 
@@ -531,7 +576,7 @@ func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bo
 	}
 
 	if rt.Kind() == reflect.Slice {
-		return unmarshalTopSlice(f, rt, val)
+		return unmarshalTopSlice(f, val)
 	}
 
 	if rt.Kind() != reflect.Map {
@@ -604,14 +649,17 @@ func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bo
 }
 
 func getInterfaceFieldName(field *reflect.StructField) string {
-	socketTag := field.Tag.Get("socket")
+	socketTag := field.Tag.Get("json")
 	if socketTag != "" {
+		if socketTag == "-" {
+			return ""
+		}
 		return socketTag
 	}
 	return field.Name
 }
 
-func unmarshalTopSlice(f *os.File, rt reflect.Type, rv reflect.Value) error {
+func unmarshalTopSlice(f *os.File, rv reflect.Value) error {
 	for {
 		fieldTypeStr, err := readLine(f)
 		if err == io.EOF {
@@ -668,6 +716,9 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 			continue
 		}
 		fieldName := getInterfaceFieldName(&field)
+		if fieldName == "" {
+			continue
+		}
 		tmpFieldMap[fieldName] = &fieldReflectInfo{
 			value: fieldVal,
 			field: field,
@@ -823,6 +874,10 @@ func settingVal(fieldTpe FieldType, val reflect.Value, f *os.File) error {
 		}
 
 		eleLen := int(eleLenInt64)
+
+		if eleLen == 0 {
+			return nil
+		}
 
 		tmpFieldTypeStr, err := readLine(f)
 		if err != nil {

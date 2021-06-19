@@ -16,6 +16,9 @@ const (
 type HookContext interface {
 	SendMsgAndReturnWithTimeout(cmd string, modType conn.ModType, sendData interface{}, timeout time.Duration) (*conn.Context, error)
 	SendMsg(cmd string, modType conn.ModType, sendData interface{}) error
+	SendVoidMsg(cmd string) error
+	SendVoidMsgAndReturn(cmd string) (*conn.Context, error)
+	SendVoidMsgAndReturnWithTimeout(cmd string, timeout time.Duration) (*conn.Context, error)
 }
 
 type engineHandle struct {

@@ -166,6 +166,14 @@ func (this *Context) ReturnErr(code, msg string) error {
 	return this.returnMsg(f)
 }
 
+func (this *Context) ReturnVoidAndRecv() (*Context, error) {
+	str, err := data.MarshalVoidStr()
+	if err != nil {
+		return nil, err
+	}
+	return this.returnMsgAndRecv(str)
+}
+
 func (this *Context) ReturnDataAndRecv(v interface{}) (*Context, error) {
 	f, err := data.Marshal(v)
 	if err != nil {
@@ -272,6 +280,70 @@ func (this *Context) MsgId() string {
 
 func (this *Context) HaveErr() bool {
 	return this.Err != nil
+}
+
+func (this *Context) SendVoidMsg(cmd string) error {
+	f, err := data.MarshalVoidStr()
+	if err != nil {
+		return err
+	}
+	return this.wsConn.SendMsg(&MsgInfo{
+		Cmd:  cmd,
+		Mod:  ModTypeMem,
+		Data: f,
+	})
+}
+
+func (this *Context) SendVoidMsgAndReturn(cmd string) (*Context, error) {
+	f, err := data.MarshalVoidStr()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := this.wsConn.SendMsgAndReturn(&MsgInfo{
+		Cmd:  cmd,
+		Mod:  ModTypeMem,
+		Data: f,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if this.children == nil {
+		this.children = make([]*Context, 0, 8)
+		this.children = append(this.children, c)
+	}
+
+	if c.HaveErr() {
+		return c, c.Err
+	}
+
+	return c, nil
+}
+
+func (this *Context) SendVoidMsgAndReturnWithTimeout(cmd string, timeout time.Duration) (*Context, error) {
+	f, err := data.MarshalVoidStr()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := this.wsConn.SendMsgAndReturnWithTimeOut(&MsgInfo{
+		Cmd:  cmd,
+		Mod:  ModTypeMem,
+		Data: f,
+	}, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if this.children == nil {
+		this.children = make([]*Context, 0, 8)
+		this.children = append(this.children, c)
+	}
+
+	if c.HaveErr() {
+		return c, c.Err
+	}
+
+	return c, nil
 }
 
 func (this *Context) SendMsg(cmd string, modType ModType, sendData interface{}) error {

@@ -717,6 +717,9 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 		if fieldName == "" {
 			continue
 		}
+
+		fieldName = strings.Split(fieldName, ",")[0]
+
 		tmpFieldMap[fieldName] = &fieldReflectInfo{
 			value: fieldVal,
 			field: field,

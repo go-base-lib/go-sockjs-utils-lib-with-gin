@@ -1041,7 +1041,7 @@ ReadStrStart:
 	}
 
 	if totalLen == length {
-		f.Seek(-1, 1)
+		//f.Seek(-1, 1)
 		str = line
 	}
 

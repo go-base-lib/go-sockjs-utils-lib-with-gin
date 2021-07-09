@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/data"
+	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/logs"
 	"os"
 	"time"
 )
@@ -266,6 +267,10 @@ func (this *Context) Cmd() string {
 	return this.cmd
 }
 
+func (this *Context) MsgFilePath() string {
+	return this.msgFilePath
+}
+
 func (this *Context) IsVoid() bool {
 	return this.isVoid
 }
@@ -435,6 +440,9 @@ func (this *Context) SendMsgAndReturn(cmd string, modType ModType, sendData inte
 }
 
 func (this *Context) Destroy() {
+	logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
+		log.DebugF("命令[%s], 消息ID[%S] 正在被销毁", this.cmd, this.mod)
+	})
 	os.RemoveAll(this.msgFilePath)
 	this.cmd = ""
 	this.mod = ""

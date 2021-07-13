@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/data"
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/logs"
+	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/sockjs/data"
+	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/sockjs/logs"
 	"github.com/gofrs/uuid"
-	"github.com/gorilla/websocket"
+	"github.com/igm/sockjs-go/v3/sockjs"
 	"io/ioutil"
 	"math"
 	"os"
@@ -46,7 +46,7 @@ func (this *MsgInfo) NeedReturn() bool {
 }
 
 type ConnectionBuf struct {
-	*websocket.Conn
+	*sockjs.Session
 	sendInfo      chan *MsgInfo
 	connBufReader *bufWebsocketReader
 	readLastBuf   *strings.Builder
@@ -157,17 +157,17 @@ func (this *ConnectionBuf) writeLoop() {
 		this.writeBuf.WriteRune('\n')
 		this.writeBuf.WriteString(string(info.Mod))
 		this.writeBuf.WriteRune('\n')
-		err := this.WriteMessage(websocket.TextMessage, this.writeBuf.Bytes())
+		err := this.Session.Send(this.writeBuf.String())
 		if err != nil {
 			info.err <- err
 			continue
 		}
 		if info.Mod == "0" {
-			err = this.WriteMessage(websocket.TextMessage, []byte(info.Data))
+			err = this.Session.Send(info.Data)
 			if err != nil {
 				info.err <- err
 			}
-			err = this.WriteMessage(websocket.TextMessage, []byte{'\n'})
+			err = this.Session.Send("\n")
 			if err != nil {
 				info.err <- err
 			}
@@ -208,14 +208,14 @@ func (this *ConnectionBuf) writeSendData(info *MsgInfo) {
 
 		sendData := this.writeBufSlice[:readLen]
 		sendDataLen := utf8.RuneCountInString(string(sendData))
-		if err = this.WriteMessage(websocket.TextMessage, bytes.Join([][]byte{
-			[]byte(strconv.FormatInt(int64(sendDataLen), 10)),
-			{'\n'},
-		}, nil)); err != nil {
+		if err = this.Session.Send(strings.Join([]string{
+			strconv.FormatInt(int64(sendDataLen), 10),
+			"\n",
+		}, "")); err != nil {
 			info.err <- err
 			return
 		}
-		if err = this.WriteMessage(websocket.TextMessage, sendData); err != nil {
+		if err = this.Session.Send(string(sendData)); err != nil {
 			info.err <- err
 			return
 		}
@@ -238,7 +238,7 @@ func (this *ConnectionBuf) writeSendData(info *MsgInfo) {
 				}
 			}
 
-			if err = this.WriteMessage(websocket.TextMessage, writeMsg); err != nil {
+			if err = this.Session.Send(string(writeMsg)); err != nil {
 				if info.callback != nil {
 					info.err <- err
 				}
@@ -247,13 +247,12 @@ func (this *ConnectionBuf) writeSendData(info *MsgInfo) {
 		}
 	}
 
-	if err = this.WriteMessage(websocket.TextMessage, memDataEndFlag); err != nil {
+	if err = this.Session.Send(string(memDataEndFlag)); err != nil {
 		if info.callback != nil {
 			info.err <- err
 		}
 		return
 	}
-
 }
 
 func (this *ConnectionBuf) ReadMsgInfo() (*MsgInfo, error) {
@@ -440,7 +439,7 @@ func (this *ConnectionBuf) Close() {
 		}
 	}
 
-	this.Conn.Close()
+	this.Session.Close(200, "success")
 	close(this.sendInfo)
 	this.sendInfo = nil
 }
@@ -458,9 +457,9 @@ func (this *ConnectionBuf) closeWaitMsg(msgInfo *MsgInfo) {
 
 }
 
-func NewConnectionBuf(wsConn *websocket.Conn) *ConnectionBuf {
+func NewConnectionBuf(wsConn *sockjs.Session) *ConnectionBuf {
 	connBuf := &ConnectionBuf{
-		Conn:          wsConn,
+		Session:       wsConn,
 		sendInfo:      make(chan *MsgInfo, 1),
 		connBufReader: newBufWebsocketReader(wsConn),
 		readLastBuf:   &strings.Builder{},

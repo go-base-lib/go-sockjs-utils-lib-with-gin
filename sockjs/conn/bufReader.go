@@ -3,23 +3,23 @@ package conn
 import (
 	"bufio"
 	"bytes"
-	"github.com/gorilla/websocket"
+	"github.com/igm/sockjs-go/v3/sockjs"
 	"io"
 )
 
 type bufWebsocketReader struct {
-	conn      *websocket.Conn
+	session   *sockjs.Session
 	bufReader *bufio.Reader
 	tmpMsg    *bytes.Buffer
 }
 
 func (this *bufWebsocketReader) initReader() error {
 	if this.bufReader == nil {
-		_, r, err := this.conn.NextReader()
+		recv, err := this.session.Recv()
 		if err != nil {
 			return err
 		}
-		this.bufReader = bufio.NewReader(r)
+		this.bufReader = bufio.NewReader(bytes.NewReader([]byte(recv)))
 	}
 	return nil
 }
@@ -67,9 +67,9 @@ ConnectHeader:
 	return readLen, nil
 }
 
-func newBufWebsocketReader(conn *websocket.Conn) *bufWebsocketReader {
+func newBufWebsocketReader(session *sockjs.Session) *bufWebsocketReader {
 	return &bufWebsocketReader{
-		conn:   conn,
+		session:   session,
 		tmpMsg: &bytes.Buffer{},
 	}
 }

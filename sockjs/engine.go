@@ -1,9 +1,9 @@
-package websocket
+package sockjs
 
 import (
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/conn"
+	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/conn"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
+	"github.com/igm/sockjs-go/v3/sockjs"
 )
 
 type HandleFn func(ctx *conn.Context) error
@@ -38,7 +38,7 @@ func (this *Engine) Handle(cmdStr string, handleFn HandleFn) *Engine {
 	return this
 }
 
-func (this *Engine) handleWs(wsConn *websocket.Conn) {
+func (this *Engine) handleWs(wsConn *sockjs.Session) {
 	handle := &engineHandle{
 		Engine:    this,
 		wsConnBuf: conn.NewConnectionBuf(wsConn),

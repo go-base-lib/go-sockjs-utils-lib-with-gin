@@ -1,12 +1,10 @@
-package websocket
+package sockjs
 
 import (
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/conn"
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/websocket/logs"
-	"github.com/gorilla/websocket"
+	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/conn"
+	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/logs"
 	"io"
 	"io/ioutil"
-	"net"
 	"time"
 )
 
@@ -43,9 +41,6 @@ func (this *engineHandle) begin() {
 // readLoop 读循环
 func (this *engineHandle) readLoop() {
 
-	this.wsConnBuf.SetReadLimit(maxMessageSize)
-	_ = this.wsConnBuf.SetReadDeadline(time.Time{})
-	this.wsConnBuf.SetPongHandler(func(string) error { _ = this.wsConnBuf.SetReadDeadline(time.Time{}); return nil })
 	logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
 		log.DebugF("检测[%s]钩子\n", HookNameOpen)
 	})
@@ -65,6 +60,9 @@ func (this *engineHandle) readLoop() {
 		}
 
 		logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
+			if context == nil {
+				return
+			}
 			file, err := ioutil.ReadFile(context.MsgFilePath())
 			if err != nil {
 				log.
@@ -78,27 +76,27 @@ func (this *engineHandle) readLoop() {
 		})
 
 		if err != nil {
-			_, ok := err.(*websocket.CloseError)
-			if ok || err == net.ErrClosed {
+			//_, ok := err.(*websocket.CloseError)
+			//if ok || err == net.ErrClosed {
+			logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
+				log.DebugF("正在检测[%s]钩子", HookNameClose)
+			})
+			if hookFn, ok := this.hookMapper[HookNameClose]; ok {
 				logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-					log.DebugF("正在检测[%s]钩子", HookNameClose)
+					log.DebugF("检测到钩子[%s], 将被执行")
 				})
-				if hookFn, ok := this.hookMapper[HookNameClose]; ok {
-					logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-						log.DebugF("检测到钩子[%s], 将被执行")
-					})
-					hookFn(this)
-					this.Destroy()
-				}
-				return
+				hookFn(this)
+				this.Destroy()
 			}
+			return
+			//}
 
-			_, ok = err.(*net.OpError)
-			if ok {
-				return
-			}
+			//_, ok = err.(*net.OpError)
+			//if ok {
+			//	return
+			//}
 
-			continue
+			//continue
 		}
 
 		go func() {

@@ -3,8 +3,8 @@ package conn
 import (
 	"bufio"
 	"errors"
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/sockjs/data"
-	"github.com/devloperPlatform/go-websocket-utils-lib-with-gin/sockjs/logs"
+	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/data"
+	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/logs"
 	"os"
 	"time"
 )

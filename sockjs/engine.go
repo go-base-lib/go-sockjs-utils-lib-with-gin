@@ -8,6 +8,7 @@ import (
 
 type HandleFn func(ctx *conn.Context) error
 type HookFn func(engine HookContext)
+type MiddlewareFn func(ctx *conn.Context) error
 
 type HookName string
 
@@ -18,8 +19,9 @@ const (
 
 type Engine struct {
 	*gin.Engine
-	handleMapper map[string]HandleFn
-	hookMapper   map[HookName]HookFn
+	handleMapper   map[string]HandleFn
+	hookMapper     map[HookName]HookFn
+	middlewareList []MiddlewareFn
 }
 
 func (this *Engine) Hook(name HookName, fn HookFn) {
@@ -36,6 +38,13 @@ func (this *Engine) Handle(cmdStr string, handleFn HandleFn) *Engine {
 	}
 	this.handleMapper[cmdStr] = handleFn
 	return this
+}
+
+func (this *Engine) Middleware(middlewareFn MiddlewareFn) {
+	if this.middlewareList == nil {
+		this.middlewareList = make([]MiddlewareFn, 8)
+	}
+	this.middlewareList = append(this.middlewareList, middlewareFn)
 }
 
 func (this *Engine) handleWs(wsConn *sockjs.Session) {

@@ -47,6 +47,7 @@ func (this *MsgInfo) NeedReturn() bool {
 
 type ConnectionBuf struct {
 	*sockjs.Session
+	connFlag      string
 	sendInfo      chan *MsgInfo
 	connBufReader *bufWebsocketReader
 	readLastBuf   *strings.Builder
@@ -55,6 +56,14 @@ type ConnectionBuf struct {
 	writeBufSlice []byte
 	msgMap        map[string]*MsgInfo
 	lock          *sync.Mutex
+}
+
+func (this *ConnectionBuf) GetConnFlag() string {
+	return this.connFlag
+}
+
+func (this *ConnectionBuf) SettingConnFlag(flag string) {
+	this.connFlag = flag
 }
 
 func (this *ConnectionBuf) SendMsgAndReturnWithTimeOut(info *MsgInfo, timeout time.Duration) (*Context, error) {

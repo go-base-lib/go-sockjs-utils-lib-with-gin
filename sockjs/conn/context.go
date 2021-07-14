@@ -54,7 +54,6 @@ func NewFieldMsgReader(fieldInfo *data.FieldInfo, fp string) *FieldMsgReader {
 }
 
 type Context struct {
-	engineFlag string
 	// Cmd 命令
 	cmd string
 	// 消息ID
@@ -440,8 +439,12 @@ func (this *Context) SendMsgAndReturn(cmd string, modType ModType, sendData inte
 	return c, err
 }
 
-func (this *Context) GetEngineFlag() string {
-	return this.engineFlag
+func (this *Context) GetConnFlag() string {
+	return this.wsConn.GetConnFlag()
+}
+
+func (this *Context) SettingConnFlag(flag string) {
+	this.wsConn.SettingConnFlag(flag)
 }
 
 func (this *Context) Destroy() {
@@ -466,9 +469,8 @@ func (this *Context) CloseConn() {
 	this.wsConn.Close()
 }
 
-func NewWebSocketContext(engineFlag string, wsConn *ConnectionBuf, cmd string, needReturn bool, msgId string, mod ModType, filePath string) *Context {
+func NewWebSocketContext(wsConn *ConnectionBuf, cmd string, needReturn bool, msgId string, mod ModType, filePath string) *Context {
 	context := &Context{
-		engineFlag:  engineFlag,
 		wsConn:      wsConn,
 		cmd:         cmd,
 		msgId:       msgId,

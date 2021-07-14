@@ -54,6 +54,7 @@ func NewFieldMsgReader(fieldInfo *data.FieldInfo, fp string) *FieldMsgReader {
 }
 
 type Context struct {
+	engineFlag string
 	// Cmd 命令
 	cmd string
 	// 消息ID
@@ -439,6 +440,10 @@ func (this *Context) SendMsgAndReturn(cmd string, modType ModType, sendData inte
 	return c, err
 }
 
+func (this *Context) GetEngineFlag() string {
+	return this.engineFlag
+}
+
 func (this *Context) Destroy() {
 	logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
 		log.DebugF("命令[%s], 消息ID[%S] 正在被销毁", this.cmd, this.mod)
@@ -461,8 +466,9 @@ func (this *Context) CloseConn() {
 	this.wsConn.Close()
 }
 
-func NewWebSocketContext(wsConn *ConnectionBuf, cmd string, needReturn bool, msgId string, mod ModType, filePath string) *Context {
+func NewWebSocketContext(engineFlag string, wsConn *ConnectionBuf, cmd string, needReturn bool, msgId string, mod ModType, filePath string) *Context {
 	context := &Context{
+		engineFlag:  engineFlag,
 		wsConn:      wsConn,
 		cmd:         cmd,
 		msgId:       msgId,

@@ -1,6 +1,7 @@
 package sockjs
 
 import (
+	"errors"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/conn"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/logs"
 	"io"
@@ -111,6 +112,19 @@ func (this *engineHandle) readLoop() {
 				_ = context.ReturnErr("404", "未找到对应请求命令")
 				return
 			}
+
+			if len(this.middlewareList) > 0 {
+				for _, middlewareFn := range this.middlewareList {
+					if err = execMiddleware(middlewareFn, context); err != nil {
+						logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
+							log.Debugln("拦截器出现异常 => ", err.Error())
+						})
+						context.ReturnErr("501", err.Error())
+						return
+					}
+				}
+			}
+
 			err = handleFn(context)
 			if err != nil {
 				context.ReturnErr("500", err.Error())
@@ -121,6 +135,25 @@ func (this *engineHandle) readLoop() {
 			}
 		}()
 	}
+}
+
+func execMiddleware(middlewareFn MiddlewareFn, ctx *conn.Context) (err error) {
+	defer func() {
+		e := recover()
+		if e != nil {
+			switch t := e.(type) {
+			case error:
+				err = t
+			case string:
+				err = errors.New(t)
+			default:
+				err = errors.New("未知的中间件异常")
+
+			}
+		}
+	}()
+
+	return middlewareFn(ctx)
 }
 
 // readMsgContext 读取一个context消息

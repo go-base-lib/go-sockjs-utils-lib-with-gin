@@ -69,13 +69,11 @@ func (this *engineHandle) readLoop() {
 			}
 			file, err := ioutil.ReadFile(context.MsgFilePath())
 			if err != nil {
-				log.
-					DebugF("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [读取失败]",
-						context.Cmd(), context.MsgId(), context.Mod(), context.IsReturn())
+				log.DebugF("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [读取失败]\n",
+					context.Cmd(), context.MsgId(), context.Mod(), context.IsReturn())
 			} else {
-				log.
-					DebugF("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [%s]",
-						context.Cmd(), context.MsgId(), context.Mod(), context.IsReturn(), string(file))
+				log.DebugF("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [%s]\n",
+					context.Cmd(), context.MsgId(), context.Mod(), context.IsReturn(), string(file))
 			}
 		})
 
@@ -83,11 +81,11 @@ func (this *engineHandle) readLoop() {
 			//_, ok := err.(*websocket.CloseError)
 			//if ok || err == net.ErrClosed {
 			logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-				log.DebugF("正在检测[%s]钩子", HookNameClose)
+				log.DebugF("正在检测[%s]钩子\n", HookNameClose)
 			})
 			if hookFn, ok := this.hookMapper[HookNameClose]; ok {
 				logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-					log.DebugF("检测到钩子[%s], 将被执行")
+					log.DebugF("检测到钩子[%s]\n, 将被执行", HookNameClose)
 				})
 				hookFn(this)
 				this.Destroy()
@@ -109,7 +107,7 @@ func (this *engineHandle) readLoop() {
 			handleFn, ok := this.matchCmd(context.Cmd())
 			if !ok {
 				logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-					log.DebugF("命令[%s]未找到对应的实现方法, 返回404", context.Cmd())
+					log.DebugF("命令[%s]未找到对应的实现方法, 返回404\n", context.Cmd())
 				})
 				_ = context.ReturnErr("404", "未找到对应请求命令")
 				return

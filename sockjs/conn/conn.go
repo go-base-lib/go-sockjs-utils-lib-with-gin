@@ -188,7 +188,7 @@ func (this *ConnectionBuf) writeLoop() {
 			if err != nil {
 				return
 			}
-			log.DebugF("命令[%s], 模式[%d], 数据[%s]被发送", info.Cmd, info.Mod, string(file))
+			log.DebugF("命令[%s], 模式[%d], 数据[%s]被发送\n", info.Cmd, info.Mod, string(file))
 		})
 		info.err <- nil
 	}

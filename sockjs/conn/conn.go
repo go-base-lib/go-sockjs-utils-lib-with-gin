@@ -100,7 +100,7 @@ func (this *ConnectionBuf) SendMsgAndReturnWithTimeOut(info *MsgInfo, timeout ti
 }
 
 func (this *ConnectionBuf) SendMsg(info *MsgInfo) error {
-	if this.sendInfo == nil {
+	if this == nil || this.sendInfo == nil {
 		return errors.New("连接已断开")
 	}
 	defer func() { recover() }()

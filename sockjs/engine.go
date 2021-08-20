@@ -42,7 +42,7 @@ func (this *Engine) Handle(cmdStr string, handleFn HandleFn) *Engine {
 
 func (this *Engine) Middleware(middlewareFn MiddlewareFn) {
 	if this.middlewareList == nil {
-		this.middlewareList = make([]MiddlewareFn, 8)
+		this.middlewareList = make([]MiddlewareFn, 0, 8)
 	}
 	this.middlewareList = append(this.middlewareList, middlewareFn)
 }

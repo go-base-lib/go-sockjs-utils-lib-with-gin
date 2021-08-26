@@ -111,7 +111,7 @@ func (this *ConnectionBuf) SendMsg(info *MsgInfo) error {
 }
 
 func (this *ConnectionBuf) SendMsgAndReturn(info *MsgInfo) (*Context, error) {
-	if this.sendInfo == nil {
+	if this == nil || this.sendInfo == nil {
 		return nil, errors.New("连接已断开")
 	}
 	info.err = make(chan error, 1)

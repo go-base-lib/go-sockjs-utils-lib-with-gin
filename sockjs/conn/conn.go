@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/data"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/logs"
 	"github.com/gofrs/uuid"
@@ -300,6 +301,7 @@ ReadBegin:
 		}
 		msgFile = filePath
 		mod = ModTypeFile
+		fmt.Println("接收到的文件路径 => ", filePath)
 	} else {
 		//datLenStr, err := this.connBufReader.ReadLine()
 		//if err != nil {

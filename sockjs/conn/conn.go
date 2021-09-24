@@ -42,6 +42,9 @@ type MsgInfo struct {
 }
 
 func (this *MsgInfo) NeedReturn() bool {
+	if this == nil {
+		return false
+	}
 	return this.needReturn
 }
 
@@ -59,10 +62,16 @@ type ConnectionBuf struct {
 }
 
 func (this *ConnectionBuf) GetConnFlag() string {
+	if this == nil {
+		return ""
+	}
 	return this.connFlag
 }
 
 func (this *ConnectionBuf) SettingConnFlag(flag string) {
+	if this == nil {
+		return
+	}
 	this.connFlag = flag
 }
 

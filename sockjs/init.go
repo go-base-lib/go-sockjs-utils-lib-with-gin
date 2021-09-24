@@ -6,16 +6,21 @@ import (
 	"strings"
 )
 
-func NewWebSocketServer(socketUrl string) *Engine {
+func NewWebSocketServer(socketUrl string, options *sockjs.Options) *Engine {
 	engine := gin.Default()
-	return NewWebSocketByGin(engine, socketUrl)
+	return NewWebSocketByGin(engine, socketUrl, options)
 }
 
-func NewWebSocketByGin(engine *gin.Engine, socketUrl string) *Engine {
+func NewWebSocketByGin(engine *gin.Engine, socketUrl string, options *sockjs.Options) *Engine {
 	websocketEngine := &Engine{
 		Engine: engine,
 	}
-	sockjsHandler := sockjs.NewHandler(socketUrl, sockjs.DefaultOptions, func(session sockjs.Session) {
+
+	if options == nil {
+		options = &sockjs.DefaultOptions
+	}
+
+	sockjsHandler := sockjs.NewHandler(socketUrl, *options, func(session sockjs.Session) {
 		websocketEngine.handleWs(&session)
 	})
 	if !strings.HasSuffix(socketUrl, "/") {

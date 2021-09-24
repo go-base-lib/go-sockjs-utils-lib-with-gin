@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-
 func NewWebSocketServer(socketUrl string) *Engine {
 	engine := gin.Default()
 	return NewWebSocketByGin(engine, socketUrl)
@@ -22,7 +21,7 @@ func NewWebSocketByGin(engine *gin.Engine, socketUrl string) *Engine {
 	if !strings.HasSuffix(socketUrl, "/") {
 		socketUrl += "/"
 	}
-	engine.GET(socketUrl+"*path", gin.WrapH(sockjsHandler))
+	engine.Any(socketUrl+"*path", gin.WrapH(sockjsHandler))
 	//engine.GET(socketUrl, func(context *gin.Context) {
 	//	ws, err := upGrader.Upgrade(context.Writer, context.Request, nil)
 	//	if err != nil {

@@ -164,6 +164,11 @@ func marshal2File(rt reflect.Type, rv reflect.Value, writer *bufio.Writer, write
 		return marshalByFieldVal(rt, rv, writer, true)
 	}
 
+	fieldNum := rv.Len()
+	writer.WriteString(strconv.FormatInt(int64(FieldTypeStruct), 10))
+	writer.WriteRune(newLine)
+	writer.WriteString(strconv.FormatInt(int64(fieldNum), 10))
+	writer.WriteRune(newLine)
 	mapRange := rv.MapRange()
 	for mapRange.Next() {
 		key := mapRange.Key()

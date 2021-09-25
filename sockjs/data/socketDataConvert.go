@@ -276,6 +276,10 @@ func marshalStruct(rt reflect.Type, rv reflect.Value, writer *bufio.Writer, writ
 }
 
 func marshalByFieldVal(t reflect.Type, fieldVal reflect.Value, writer *bufio.Writer, writeType bool) error {
+	for fieldVal.Kind() == reflect.Interface {
+		fieldVal = fieldVal.Elem()
+		t = fieldVal.Type()
+	}
 	fieldType, fieldTypeStr, err := marshalType2FieldType(t)
 	if err != nil {
 		return err

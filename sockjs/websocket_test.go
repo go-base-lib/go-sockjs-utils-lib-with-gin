@@ -3,12 +3,13 @@ package sockjs
 import (
 	"fmt"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/conn"
+	"github.com/igm/sockjs-go/v3/sockjs"
 	"testing"
 )
 
 func TestWebSocket(t *testing.T) {
 
-	engine := NewWebSocketServer("/dev")
+	engine := NewWebSocketServer("/dev", &sockjs.DefaultOptions)
 	engine.Handle("hello", func(ctx *conn.Context) error {
 		type tmpStrut struct {
 			Hello string `json:"hello"`

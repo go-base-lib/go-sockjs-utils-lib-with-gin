@@ -630,6 +630,11 @@ func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bo
 			return nil
 		}
 
+		if name == "" {
+			i = i - 1
+			continue
+		}
+
 		if err != nil {
 			return errors.New("获取数据字段名称失败")
 		}
@@ -1050,7 +1055,7 @@ ReadStrStart:
 	}
 
 	if totalLen == length {
-		//f.Seek(-1, 1)
+		f.Seek(-1, 1)
 		str = line
 	}
 

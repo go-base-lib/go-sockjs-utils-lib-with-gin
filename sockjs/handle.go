@@ -1,9 +1,10 @@
 package sockjs
 
 import (
+	"coder.byzk.cn/golibs/common/logs"
 	"errors"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/conn"
-	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/logs"
+	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"time"
@@ -45,48 +46,40 @@ func (this *engineHandle) begin() {
 // readLoop 读循环
 func (this *engineHandle) readLoop() {
 
-	logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-		log.DebugF("检测[%s]钩子\n", HookNameOpen)
-	})
+	logs.Debugf("检测[%s]钩子\n", HookNameOpen)
+
 	if hookFn, ok := this.hookMapper[HookNameOpen]; ok {
-		logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-			log.DebugF("发现[%s]钩子即将异步执行\n", HookNameOpen)
-		})
+		logs.Debugf("发现[%s]钩子即将异步执行\n", HookNameOpen)
 		go hookFn(this)
 	}
 	for {
 		context, err := this.readMsgContext()
 		if err == io.EOF {
-			logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-				log.Debugln("消息读到尾部，退出消息监听")
-			})
+			logs.Debugln("消息读到尾部，退出消息监听")
 			return
 		}
 
-		logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-			if context == nil {
-				return
-			}
+		if context == nil {
+			return
+		}
+
+		if logs.CurrentLevel() >= logrus.DebugLevel {
 			file, err := ioutil.ReadFile(context.MsgFilePath())
 			if err != nil {
-				log.DebugF("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [读取失败]\n",
+				logs.Debugf("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [读取失败]\n",
 					context.Cmd(), context.MsgId(), context.Mod(), context.IsReturn())
 			} else {
-				log.DebugF("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [%s]\n",
+				logs.Debugf("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [%s]\n",
 					context.Cmd(), context.MsgId(), context.Mod(), context.IsReturn(), string(file))
 			}
-		})
+		}
 
 		if err != nil {
 			//_, ok := err.(*websocket.CloseError)
 			//if ok || err == net.ErrClosed {
-			logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-				log.DebugF("正在检测[%s]钩子\n", HookNameClose)
-			})
+			logs.Debugf("正在检测[%s]钩子\n", HookNameClose)
 			if hookFn, ok := this.hookMapper[HookNameClose]; ok {
-				logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-					log.DebugF("检测到钩子[%s]\n, 将被执行", HookNameClose)
-				})
+				logs.Debugf("检测到钩子[%s]\n, 将被执行", HookNameClose)
 				hookFn(this)
 				this.Destroy()
 			}
@@ -106,9 +99,7 @@ func (this *engineHandle) readLoop() {
 			defer context.Destroy()
 			handleFn, ok := this.matchCmd(context.Cmd())
 			if !ok {
-				logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-					log.DebugF("命令[%s]未找到对应的实现方法, 返回404\n", context.Cmd())
-				})
+				logs.Debugf("命令[%s]未找到对应的实现方法, 返回404\n", context.Cmd())
 				_ = context.ReturnErr("404", "未找到对应请求命令")
 				return
 			}
@@ -116,9 +107,7 @@ func (this *engineHandle) readLoop() {
 			if len(this.middlewareList) > 0 {
 				for _, middlewareFn := range this.middlewareList {
 					if err = execMiddleware(middlewareFn, context); err != nil {
-						logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-							log.Debugln("拦截器出现异常 => ", err.Error())
-						})
+						logs.Debugln("拦截器出现异常 => ", err.Error())
 						context.ReturnErr("501", err.Error())
 						return
 					}

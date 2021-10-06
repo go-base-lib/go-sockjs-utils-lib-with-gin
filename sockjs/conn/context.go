@@ -2,9 +2,9 @@ package conn
 
 import (
 	"bufio"
+	"coder.byzk.cn/golibs/common/logs"
 	"errors"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/data"
-	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/logs"
 	"os"
 	"time"
 )
@@ -448,9 +448,7 @@ func (this *Context) SettingConnFlag(flag string) {
 }
 
 func (this *Context) Destroy() {
-	logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
-		log.DebugF("命令[%s], 消息ID[%s] 正在被销毁\n", this.cmd, this.mod)
-	})
+	logs.Debugf("命令[%s], 消息ID[%s] 正在被销毁\n", this.cmd, this.mod)
 	os.RemoveAll(this.msgFilePath)
 	this.cmd = ""
 	this.mod = ""

@@ -2,12 +2,13 @@ package conn
 
 import (
 	"bytes"
+	"coder.byzk.cn/golibs/common/logs"
 	"context"
 	"errors"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/data"
-	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/logs"
 	"github.com/gofrs/uuid"
 	"github.com/igm/sockjs-go/v3/sockjs"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math"
 	"os"
@@ -192,13 +193,14 @@ func (this *ConnectionBuf) writeLoop() {
 		} else {
 			this.writeSendData(info)
 		}
-		logs.LogRecord(logs.Debug, func(log logs.SocketLogs) {
+		if logs.CurrentLevel() >= logrus.DebugLevel {
 			file, err := ioutil.ReadFile(info.Data)
 			if err != nil {
 				return
 			}
-			log.DebugF("命令[%s], 模式[%d], 数据[%s]被发送\n", info.Cmd, info.Mod, string(file))
-		})
+			logs.Debugf("命令[%s], 模式[%d], 数据[%s]被发送\n", info.Cmd, info.Mod, string(file))
+		}
+
 		info.err <- nil
 	}
 }

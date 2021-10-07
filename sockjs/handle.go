@@ -66,10 +66,10 @@ func (this *engineHandle) readLoop() {
 		if logs.CurrentLevel() >= logrus.DebugLevel {
 			file, err := ioutil.ReadFile(context.MsgFilePath())
 			if err != nil {
-				logs.Debugf("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [读取失败]\n",
+				logs.Debugf("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [读取失败]",
 					context.Cmd(), context.MsgId(), context.Mod(), context.IsReturn())
 			} else {
-				logs.Debugf("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: [%s]\n",
+				logs.Debugf("读取到一条消息, 命令码: [%s], 消息ID: [%s], 传输模式: [%s], 是否需要返回: [%s], 消息内容: \n%s\n",
 					context.Cmd(), context.MsgId(), context.Mod(), context.IsReturn(), string(file))
 			}
 		}

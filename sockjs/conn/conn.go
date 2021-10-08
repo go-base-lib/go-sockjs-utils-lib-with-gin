@@ -190,14 +190,15 @@ func (this *ConnectionBuf) writeLoop() {
 			if err != nil {
 				info.err <- err
 			}
+			if logs.CurrentLevel() >= logrus.DebugLevel {
+				f, e := ioutil.ReadFile(info.Data)
+				if e == nil {
+					logs.Debugf("命令[%s], 模式[%d], 数据将被发送: \n%s", info.Cmd, info.Mod, string(f))
+				}
+			}
+
 		} else {
 			this.writeSendData(info)
-		}
-		if logs.CurrentLevel() >= logrus.DebugLevel {
-			file, err := ioutil.ReadFile(info.Data)
-			if err == nil {
-				logs.Debugf("命令[%s], 模式[%d], 数据将被发送: \n%s", info.Cmd, info.Mod, string(file))
-			}
 		}
 
 		info.err <- nil
@@ -217,6 +218,13 @@ func (this *ConnectionBuf) writeSendData(info *MsgInfo) {
 	if err != nil {
 		info.err <- err
 		return
+	}
+
+	if logs.CurrentLevel() >= logrus.DebugLevel {
+		f, e := ioutil.ReadFile(info.Data)
+		if e == nil {
+			logs.Debugf("命令[%s], 模式[%d], 数据将被发送: \n%s", info.Cmd, info.Mod, string(f))
+		}
 	}
 
 	if stat.Size() <= maxMsgSize {

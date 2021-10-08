@@ -193,7 +193,7 @@ func (this *ConnectionBuf) writeLoop() {
 			if logs.CurrentLevel() >= logrus.DebugLevel {
 				f, e := ioutil.ReadFile(info.Data)
 				if e == nil {
-					logs.Debugf("命令[%s], 模式[%d], 数据将被发送: \n%s", info.Cmd, info.Mod, string(f))
+					logs.Debugf("命令[%s], 模式[%s], 数据将被发送: \n%s", info.Cmd, info.Mod, string(f))
 				}
 			}
 
@@ -223,7 +223,7 @@ func (this *ConnectionBuf) writeSendData(info *MsgInfo) {
 	if logs.CurrentLevel() >= logrus.DebugLevel {
 		f, e := ioutil.ReadFile(info.Data)
 		if e == nil {
-			logs.Debugf("命令[%s], 模式[%d], 数据将被发送: \n%s", info.Cmd, info.Mod, string(f))
+			logs.Debugf("命令[%s], 模式[%s], 数据将被发送: \n%s", info.Cmd, info.Mod, string(f))
 		}
 	}
 

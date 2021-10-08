@@ -46,10 +46,10 @@ func (this *engineHandle) begin() {
 // readLoop 读循环
 func (this *engineHandle) readLoop() {
 
-	logs.Debugf("检测[%s]钩子\n", HookNameOpen)
+	logs.Debugf("检测[%s]钩子", HookNameOpen)
 
 	if hookFn, ok := this.hookMapper[HookNameOpen]; ok {
-		logs.Debugf("发现[%s]钩子即将异步执行\n", HookNameOpen)
+		logs.Debugf("发现[%s]钩子即将异步执行", HookNameOpen)
 		go hookFn(this)
 	}
 	for {
@@ -77,9 +77,9 @@ func (this *engineHandle) readLoop() {
 		if err != nil {
 			//_, ok := err.(*websocket.CloseError)
 			//if ok || err == net.ErrClosed {
-			logs.Debugf("正在检测[%s]钩子\n", HookNameClose)
+			logs.Debugf("正在检测[%s]钩子", HookNameClose)
 			if hookFn, ok := this.hookMapper[HookNameClose]; ok {
-				logs.Debugf("检测到钩子[%s]\n, 将被执行", HookNameClose)
+				logs.Debugf("检测到钩子[%s], 将被执行", HookNameClose)
 				hookFn(this)
 				this.Destroy()
 			}
@@ -99,7 +99,7 @@ func (this *engineHandle) readLoop() {
 			defer context.Destroy()
 			handleFn, ok := this.matchCmd(context.Cmd())
 			if !ok {
-				logs.Debugf("命令[%s]未找到对应的实现方法, 返回404\n", context.Cmd())
+				logs.Debugf("命令[%s]未找到对应的实现方法, 返回404", context.Cmd())
 				_ = context.ReturnErr("404", "未找到对应请求命令")
 				return
 			}

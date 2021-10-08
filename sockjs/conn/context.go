@@ -448,7 +448,7 @@ func (this *Context) SettingConnFlag(flag string) {
 }
 
 func (this *Context) Destroy() {
-	logs.Debugf("命令[%s], 消息ID[%s] 正在被销毁\n", this.cmd, this.mod)
+	logs.Debugf("命令[%s], 消息ID[%s] 正在被销毁", this.cmd, this.mod)
 	os.RemoveAll(this.msgFilePath)
 	this.cmd = ""
 	this.mod = ""

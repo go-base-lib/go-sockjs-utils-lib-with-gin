@@ -196,7 +196,7 @@ func (this *ConnectionBuf) writeLoop() {
 		if logs.CurrentLevel() >= logrus.DebugLevel {
 			file, err := ioutil.ReadFile(info.Data)
 			if err != nil {
-				return
+				continue
 			}
 			logs.Debugf("命令[%s], 模式[%d], 数据[%s]被发送\n", info.Cmd, info.Mod, string(file))
 		}

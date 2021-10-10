@@ -1054,9 +1054,11 @@ ReadStrStart:
 		}
 	}
 
-	if totalLen == length && isHaveNewLine {
-		f.Seek(-1, 1)
+	if totalLen == length {
 		str = line
+		if isHaveNewLine {
+			f.Seek(-1, 1)
+		}
 	}
 
 	return str, nil

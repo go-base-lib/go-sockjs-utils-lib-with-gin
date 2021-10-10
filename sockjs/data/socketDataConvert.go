@@ -48,7 +48,7 @@ func IsErr(data string) bool {
 
 func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 	defer f.Close()
-	fieldType, err := readLine(f)
+	fieldType, _, err := readLine(f)
 	if err != nil {
 		return nil, err
 	}
@@ -57,12 +57,12 @@ func Unmarshal2Err(f *os.File) (*ErrorMsg, error) {
 		return nil, errors.New("非错误类型")
 	}
 
-	code, err := readLine(f)
+	code, _, err := readLine(f)
 	if err != nil {
 		return nil, err
 	}
 
-	msgLenStr, err := readLine(f)
+	msgLenStr, _, err := readLine(f)
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +571,7 @@ func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bo
 	}
 
 	if fieldType == FieldTypeString || fieldType == FieldTypeInteger || fieldType == FieldTypeBool || fieldType == FieldTypeDouble {
-		_, err = readLine(f)
+		_, _, err = readLine(f)
 		if err != nil {
 			return err
 		}
@@ -596,7 +596,7 @@ func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bo
 	}
 
 	if readStructType {
-		fieldTypeStr, err := readLine(f)
+		fieldTypeStr, _, err := readLine(f)
 		if err != nil {
 			return err
 		}
@@ -611,7 +611,7 @@ func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bo
 		}
 	}
 
-	fieldNumStr, err := readLine(f)
+	fieldNumStr, _, err := readLine(f)
 	if err != nil {
 		return err
 	}
@@ -625,7 +625,7 @@ func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bo
 		val = val.Elem()
 	}
 	for i := int64(0); i < fieldNum; i++ {
-		name, err := readLine(f)
+		name, _, err := readLine(f)
 		if err == io.EOF {
 			return nil
 		}
@@ -639,7 +639,7 @@ func unmarshal(val reflect.Value, rt reflect.Type, f *os.File, readStructType bo
 			return errors.New("获取数据字段名称失败")
 		}
 
-		fieldTypeStr, err := readLine(f)
+		fieldTypeStr, _, err := readLine(f)
 		if err != nil {
 			return errors.New("获取字段类型失败")
 		}
@@ -673,7 +673,7 @@ func getInterfaceFieldName(field *reflect.StructField) string {
 
 func unmarshalTopSlice(f *os.File, rv reflect.Value) error {
 	for {
-		fieldTypeStr, err := readLine(f)
+		fieldTypeStr, _, err := readLine(f)
 		if err == io.EOF {
 			return nil
 		}
@@ -706,7 +706,7 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 		rv = rv.Elem()
 	}
 	if readStructType {
-		fieldTypeStr, err := readLine(f)
+		fieldTypeStr, _, err := readLine(f)
 		if err != nil {
 			return err
 		}
@@ -740,7 +740,7 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 		}
 	}
 
-	fieldLenStr, err := readLine(f)
+	fieldLenStr, _, err := readLine(f)
 	if err != nil {
 		return errors.New("获取字段个数失败")
 	}
@@ -756,7 +756,7 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 		if settingFieldNum > fieldLen {
 			return nil
 		}
-		name, err := readLine(f)
+		name, _, err := readLine(f)
 		if err == io.EOF {
 			return nil
 		}
@@ -765,7 +765,7 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 			return errors.New("获取数据字段名称失败")
 		}
 
-		fieldTypeStr, err := readLine(f)
+		fieldTypeStr, _, err := readLine(f)
 		if err != nil {
 			return errors.New("获取字段类型失败")
 		}
@@ -780,7 +780,7 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 		info, ok := tmpFieldMap[name]
 		if !ok {
 			if fieldType == FieldTypeString {
-				dataLenStr, err := readLine(f)
+				dataLenStr, _, err := readLine(f)
 				if err != nil {
 					return errors.New("获取数据长度失败")
 				}
@@ -795,7 +795,7 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 					return err
 				}
 			} else if fieldType == FieldTypeList {
-				eleLenStr, err := readLine(f)
+				eleLenStr, _, err := readLine(f)
 				if err != nil {
 					return err
 				}
@@ -806,14 +806,14 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 				}
 				if info.value.Elem().Kind() != reflect.String {
 					for i := 0; i < int(eleLen); i++ {
-						_, err = readLine(f)
+						_, _, err = readLine(f)
 						if err != nil {
 							return err
 						}
 					}
 				} else {
 					for i := 0; i < int(eleLen); i++ {
-						lineStr, err := readLine(f)
+						lineStr, _, err := readLine(f)
 						if err != nil {
 							return err
 						}
@@ -824,14 +824,14 @@ func unmarshalStruct(f *os.File, rt reflect.Type, rv reflect.Value, readStructTy
 						f.Seek(dataLen, 1)
 						//reader.Discard(int(dataLen))
 					}
-					_, err = readLine(f)
+					_, _, err = readLine(f)
 					if err != nil {
 						return err
 					}
 				}
 
 			} else {
-				_, err = readLine(f)
+				_, _, err = readLine(f)
 				if err != nil {
 					return err
 				}
@@ -879,7 +879,7 @@ func settingVal(fieldTpe FieldType, val reflect.Value, f *os.File) error {
 		}
 		fieldData = reflect.ValueOf(data)
 	case FieldTypeList:
-		eleLenStr, err := readLine(f)
+		eleLenStr, _, err := readLine(f)
 		if err != nil {
 			return err
 		}
@@ -894,7 +894,7 @@ func settingVal(fieldTpe FieldType, val reflect.Value, f *os.File) error {
 			return nil
 		}
 
-		tmpFieldTypeStr, err := readLine(f)
+		tmpFieldTypeStr, _, err := readLine(f)
 		if err != nil {
 			return err
 		}
@@ -930,7 +930,7 @@ func settingVal(fieldTpe FieldType, val reflect.Value, f *os.File) error {
 		val.Set(slice)
 
 		if tmpFieldType == FieldTypeString {
-			_, err = readLine(f)
+			_, _, err = readLine(f)
 			if err != nil {
 				return err
 			}
@@ -964,7 +964,7 @@ func settingVal(fieldTpe FieldType, val reflect.Value, f *os.File) error {
 }
 
 func readBool(f *os.File) (bool, error) {
-	tmpBuf, err := readLine(f)
+	tmpBuf, _, err := readLine(f)
 	if err != nil {
 		return false, errors.New("读取内容失败")
 	}
@@ -976,7 +976,7 @@ func readBool(f *os.File) (bool, error) {
 }
 
 func readDouble(f *os.File) (float64, error) {
-	tmpBuf, err := readLine(f)
+	tmpBuf, _, err := readLine(f)
 	if err != nil {
 		return 0, errors.New("读取内容失败")
 	}
@@ -987,7 +987,7 @@ func readDouble(f *os.File) (float64, error) {
 	return float, nil
 }
 func readIntData(f *os.File) (int64, error) {
-	tmpBuf, err := readLine(f)
+	tmpBuf, _, err := readLine(f)
 	if err != nil {
 		return 0, errors.New("读取内容失败")
 	}
@@ -998,7 +998,7 @@ func readIntData(f *os.File) (int64, error) {
 	return parseInt, nil
 }
 func readStringData(f *os.File) (string, error) {
-	dataLenStr, err := readLine(f)
+	dataLenStr, _, err := readLine(f)
 	if err != nil {
 		return "", errors.New("获取数据长度失败")
 	}
@@ -1012,19 +1012,19 @@ func readStringData(f *os.File) (string, error) {
 	return str, nil
 }
 
-func readLine(f *os.File) (string, error) {
+func readLine(f *os.File) (string, bool, error) {
 	buff := &bytes.Buffer{}
 	tmpBuf := make([]byte, 1, 1)
 	for {
 		_, err := f.Read(tmpBuf)
 		if err == io.EOF && buff.Len() > 0 {
-			return buff.String(), nil
+			return buff.String(), false, nil
 		}
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		if tmpBuf[0] == newLine {
-			return buff.String(), nil
+			return buff.String(), true, nil
 		}
 		buff.Write(tmpBuf)
 	}
@@ -1034,7 +1034,7 @@ func readLenStr(length int, f *os.File) (string, error) {
 	str := ""
 	totalLen := 0
 ReadStrStart:
-	line, err := readLine(f)
+	line, isHaveNewLine, err := readLine(f)
 	if err != nil {
 		return "", err
 	}
@@ -1054,7 +1054,7 @@ ReadStrStart:
 		}
 	}
 
-	if totalLen == length {
+	if totalLen == length && isHaveNewLine {
 		f.Seek(-1, 1)
 		str = line
 	}

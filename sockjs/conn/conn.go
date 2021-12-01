@@ -17,7 +17,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 )
 
 const maxMsgSize = 1024 * 1024
@@ -235,14 +234,14 @@ func (this *ConnectionBuf) writeSendData(info *MsgInfo) {
 		}
 
 		sendData := this.writeBufSlice[:readLen]
-		sendDataLen := utf8.RuneCountInString(string(sendData))
-		if err = this.Session.Send(strings.Join([]string{
-			strconv.FormatInt(int64(sendDataLen), 10),
-			"\n",
-		}, "")); err != nil {
-			info.err <- err
-			return
-		}
+		//sendDataLen := utf8.RuneCountInString(string(sendData))
+		//if err = this.Session.Send(strings.Join([]string{
+		//	strconv.FormatInt(int64(sendDataLen), 10),
+		//	"\n",
+		//}, "")); err != nil {
+		//	info.err <- err
+		//	return
+		//}
 		if err = this.Session.Send(string(sendData)); err != nil {
 			info.err <- err
 			return

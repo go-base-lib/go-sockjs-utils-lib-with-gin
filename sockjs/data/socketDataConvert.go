@@ -931,7 +931,7 @@ func settingVal(fieldTpe FieldType, val reflect.Value, f *os.File) error {
 
 		if tmpFieldType == FieldTypeString {
 			_, _, err = readLine(f)
-			if err != nil {
+			if err != nil && err != io.EOF {
 				return err
 			}
 		}

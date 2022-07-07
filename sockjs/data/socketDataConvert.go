@@ -302,7 +302,7 @@ func marshalByFieldVal(t reflect.Type, fieldVal reflect.Value, writer *bufio.Wri
 		writer.WriteString(fmt.Sprintln(strLen))
 		writer.WriteString(str)
 	case FieldTypeBool:
-		fallthrough
+		writer.WriteString("0")
 	case FieldTypeInteger:
 		fallthrough
 	case FieldTypeDouble:

@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/go-websocket-utils-lib-with-gin.iml" filepath="$PROJECT_DIR$/.idea/go-websocket-utils-lib-with-gin.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/03-go-sockjs-utils-lib-with-gin.iml" filepath="$PROJECT_DIR$/.idea/03-go-sockjs-utils-lib-with-gin.iml" />
     </modules>
   </component>
 </project>

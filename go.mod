@@ -10,3 +10,5 @@ require (
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/sirupsen/logrus v1.8.1
 )
+
+replace coder.byzk.cn/golibs/common/logs => E:\01-work\02-golang\00-base\logs

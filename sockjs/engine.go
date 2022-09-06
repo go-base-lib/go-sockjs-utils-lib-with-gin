@@ -1,8 +1,8 @@
 package sockjs
 
 import (
-	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/conn"
 	"github.com/gin-gonic/gin"
+	"github.com/go-base-lib/go-sockjs-utils-lib-with-gin/sockjs/conn"
 	"github.com/igm/sockjs-go/v3/sockjs"
 )
 

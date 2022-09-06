@@ -1,4 +1,4 @@
-module github.com/devloperPlatform/go-sockjs-utils-lib-with-gin
+module github.com/go-base-lib/go-sockjs-utils-lib-with-gin
 
 go 1.16
 

@@ -3,7 +3,7 @@ package conn
 import (
 	"bufio"
 	"errors"
-	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/data"
+	"github.com/go-base-lib/go-sockjs-utils-lib-with-gin/sockjs/data"
 	"github.com/go-base-lib/logs"
 	"os"
 	"time"

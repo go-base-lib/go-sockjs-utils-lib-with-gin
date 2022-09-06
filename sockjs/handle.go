@@ -2,7 +2,7 @@ package sockjs
 
 import (
 	"errors"
-	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/conn"
+	"github.com/go-base-lib/go-sockjs-utils-lib-with-gin/sockjs/conn"
 	"github.com/go-base-lib/logs"
 	"github.com/sirupsen/logrus"
 	"io"

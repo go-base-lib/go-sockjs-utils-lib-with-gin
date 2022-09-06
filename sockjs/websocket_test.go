@@ -2,7 +2,7 @@ package sockjs
 
 import (
 	"fmt"
-	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/conn"
+	"github.com/go-base-lib/go-sockjs-utils-lib-with-gin/sockjs/conn"
 	"github.com/igm/sockjs-go/v3/sockjs"
 	"testing"
 )

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/data"
+	"github.com/go-base-lib/go-sockjs-utils-lib-with-gin/sockjs/data"
 	"github.com/go-base-lib/logs"
 	"github.com/gofrs/uuid"
 	"github.com/igm/sockjs-go/v3/sockjs"

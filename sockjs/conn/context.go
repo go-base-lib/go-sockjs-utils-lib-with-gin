@@ -2,9 +2,9 @@ package conn
 
 import (
 	"bufio"
-	"coder.byzk.cn/golibs/common/logs"
 	"errors"
 	"github.com/devloperPlatform/go-sockjs-utils-lib-with-gin/sockjs/data"
+	"github.com/go-base-lib/logs"
 	"os"
 	"time"
 )
